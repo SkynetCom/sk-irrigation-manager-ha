@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.0 — sin publicar
+- **Línea de tiempo interactiva** en el editor de programas: arrastrá el borde de una barra para cambiar
+  el tiempo de ese aspersor (pasos de 30 s) o la barra entera para cambiar su orden de encendido; zoom
+  con desplazamiento horizontal para ciclos largos.
+- **Tarjetas para dashboards** (se cargan solas, sin recursos manuales): Estado, Ciclos, Grupos y Aspersores,
+  con editor visual y una única suscripción compartida.
+- Condiciones: **autocompletado** del campo Entidad con estado actual, **valores sugeridos** para condiciones de
+  estado y aviso de entidad inexistente.
+- Omisión rápida: explicación de uso, estado en vivo de cada sensor de lluvia, aviso de sensores no binarios
+  y resaltado del clima actual.
+- El estado y las tarjetas reaccionan **al instante** cuando cambia un sensor usado en condiciones.
+- Duración estimada de cada ciclo disponible para las tarjetas.
+- Botón de donación **Invitame un café** (PayPal) en README, GitHub Sponsor y Ajustes.
+
 ## 1.2.2 — 2026-10-15
 - README compatible con el visor de HACS: imágenes con URL absoluta y diagrama de flujo como imagen
   (HACS no resuelve rutas relativas ni dibuja Mermaid). Sin cambios funcionales.

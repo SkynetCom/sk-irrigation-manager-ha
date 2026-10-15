@@ -99,7 +99,7 @@ class SkIrrigationPanel extends HTMLElement {
     sr.addEventListener("pointerdown", (e) => this._onPointerDown(e));
     sr.addEventListener("pointermove", (e) => this._onPointerMove(e));
     sr.addEventListener("pointerup", (e) => this._onPointerUp(e));
-    sr.addEventListener("pointercancel", () => this._cancelDrag());
+    sr.addEventListener("pointercancel", () => { if (this._tl) this._tlCancel(); else this._cancelDrag(); });
     sr.addEventListener("keydown", (e) => {
       if (this._pk && (e.target.dataset?.bind === "pk-search" || e.target.dataset?.suggest || e.key === "Escape")) this._pkKey(e);
     });
@@ -262,7 +262,7 @@ class SkIrrigationPanel extends HTMLElement {
   _programPlan(program) {
     const factor = (this._budget() / 100) * ((program.budget ?? 100) / 100);
     const maxMin = this._config.settings.max_zone_minutes || 120;
-    return (program.steps || []).map((step) => {
+    return (program.steps || []).map((step, si) => {
       const g = this._group(step.group_id);
       if (!g) return null;
       const skip = new Set(step.skip || []);
@@ -272,7 +272,7 @@ class SkIrrigationPanel extends HTMLElement {
         minutes = Math.min(Number(minutes) || 0, maxMin);
         return { zone_id: z.id, name: z.name, color: z.color, seconds: Math.round(minutes * 60 * factor) };
       }).filter((z) => z.seconds > 0);
-      return { label: g.name, color: g.color, concurrency: step.concurrency, zones };
+      return { label: g.name, color: g.color, concurrency: step.concurrency, zones, si };
     }).filter((s) => s && s.zones.length);
   }
 
@@ -794,8 +794,14 @@ class SkIrrigationPanel extends HTMLElement {
           ${section(2, "", this.t("calendar"), calendar)}
           ${section(3, "", this.t("start_times"), starts)}
           ${section(4, "", this.t("conditions_title"), `<p class="hint">${this.t("prog_cond_hint")}</p>${this._condEditorHtml("prog")}`)}
-          ${section(5, "", this.t("sequence"), sequence)}
-          ${section(6, "", this.t("advanced"), advanced)}
+          <div class="card tl-card"><div class="hd"><span class="section-n">5</span><h2>${this.t("tl_title")}</h2>
+            <span class="badge blue"><ha-icon icon="mdi:gesture-swipe-horizontal" style="--mdc-icon-size:14px"></ha-icon>${this.t("tl_badge")}</span>
+            <div class="seg tl-zoom"><button data-action="tl-zoom" data-v="-1" title="${this.t("zoom_out")}"><ha-icon icon="mdi:magnify-minus-outline"></ha-icon></button>
+              <button class="${this._tlZoom ? "" : "on"}" data-action="tl-zoom" data-v="0" title="${this.t("zoom_fit")}"><ha-icon icon="mdi:arrow-expand-horizontal"></ha-icon></button>
+              <button data-action="tl-zoom" data-v="1" title="${this.t("zoom_in")}"><ha-icon icon="mdi:magnify-plus-outline"></ha-icon></button></div></div>
+            <div class="bd" id="tl-body">${this._timelineHtml()}</div></div>
+          ${section(6, "", this.t("sequence"), sequence)}
+          ${section(7, "", this.t("advanced"), advanced)}
         </div>
         <div class="side">
           <div class="card"><div class="hd"><h3><ha-icon icon="mdi:vector-arrange-below"></ha-icon>${this.t("groups_palette")}</h3></div><div class="bd">
@@ -883,23 +889,142 @@ class SkIrrigationPanel extends HTMLElement {
     const zoneCount = sim.bars.length;
     const water = sim.bars.reduce((acc, b) => acc + ((this._zone(b.zone_id)?.flow_rate || 0) * b.seconds) / 60, 0);
     const cap = this._config.settings.max_concurrent;
-    const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => fmtDur(total * f));
     return `<div class="hd"><h3><ha-icon icon="mdi:chart-gantt"></ha-icon>${this.t("preview")}</h3></div><div class="bd">
       <div class="kpis"><div class="kpi"><b>${fmtDur(sim.total)}</b><span>${this.t("est_duration")}</span></div>
         <div class="kpi"><b>${zoneCount}</b><span>${this.t("zones")}</span></div>
         <div class="kpi"><b>${water ? `${Math.round(water)} L` : "—"}</b><span>${this.t("h_water")}</span></div></div>
-      ${sim.bars.length ? `<div class="sub muted small" style="margin:14px 0 8px">${this.t("timeline")}</div>
-      <div class="timeline">${sim.bars.map((b) => `<div class="tl-row"><span class="lab">${esc(b.name)}</span>
-        <div class="tl-track"><span class="tl-bar" style="--c:${esc(b.color)};left:${(b.start / total) * 100}%;width:${((b.end - b.start) / total) * 100}%"
-          title="${esc(b.name)} · ${fmtDur(b.end - b.start)}"></span></div></div>`).join("")}</div>
-      <div class="tl-axis"><span>${ticks[0]}</span><span>${ticks[2]}</span><span>${ticks[4]}</span></div>` : ""}
       <p class="hint" style="margin-top:12px">${this.t("sim_hint", { b: Math.round(this._budget() * (p.budget / 100)), c: cap || this.t("unlimited") })}</p>
     </div>`;
+  }
+
+  // ------------------------------------------------------------ interactive timeline
+  // Gantt of the program being edited. Drag a bar's right edge to change that
+  // sprinkler's time (30 s steps); drag the bar sideways to change its start
+  // order inside its group. The scale stays fixed while dragging.
+  _tlTicks(total) {
+    const nice = [60, 120, 300, 600, 900, 1800, 3600, 7200, 14400];
+    // ~7 ticks when fitted; with zoom, one tick every ~90 px
+    const target = this._tlZoom ? 90 / (this._tlZoom / 60) : total / 7;
+    const step = nice.find((n) => n >= target) || 14400;
+    const out = [];
+    for (let t = 0; t <= total + 1; t += step) out.push(t);
+    return { step, out };
+  }
+
+  _tlFactor() {
+    return (this._budget() / 100) * ((this._edit.budget ?? 100) / 100);
+  }
+
+  _timelineHtml() {
+    const p = this._edit;
+    const s = this._config.settings;
+    const plan = this._programPlan(p);
+    const zd = p.zone_delay_s >= 0 ? p.zone_delay_s : s.zone_delay_s;
+    const sd = p.step_delay_s >= 0 ? p.step_delay_s : s.step_delay_s;
+    const sim = simulate(plan, s.max_concurrent, zd, sd);
+    this._tlData = { plan, sim };
+    if (!sim.bars.length) return `<div class="empty small">${this.t("tl_empty")}</div>`;
+    const total = Math.max(60, sim.total);
+    const { step, out } = this._tlTicks(total);
+    const pct = (sec) => (sec / total) * 100;
+    const gridBg = `background-size:${pct(step)}% 100%`;
+    const can = this._can();
+    let html = "";
+    plan.forEach((ps, pi) => {
+      const conc = ps.concurrency === 0 ? this.t("all") : ps.concurrency === 1 ? this.t("sequential") : `${ps.concurrency} ${this.t("at_once")}`;
+      html += `<div class="tl2-step" style="--c:${esc(ps.color)}"><span class="dot" style="background:${esc(ps.color)}"></span>
+        ${pi + 1}. ${esc(ps.label)} <span class="muted">· ${conc}</span></div>`;
+      sim.bars.filter((b) => b.step === pi).forEach((b) => {
+        const secs = b.end - b.start;
+        html += `<div class="tl2-row"><span class="tl2-lab" title="${esc(b.name)}">${esc(b.name)}</span>
+          <div class="tl2-track" style="${gridBg}">
+            <div class="tl2-bar ${can ? "" : "ro"}" ${can ? `data-tl="move"` : ""} data-si="${ps.si}" data-z="${esc(b.zone_id)}" data-total="${total}"
+              data-start="${b.start}" data-secs="${secs}" style="--c:${esc(b.color)};left:${pct(b.start)}%;width:${pct(secs)}%"
+              title="${esc(b.name)} · ${fmtDur(secs)} (${fmtDur(b.start)} → ${fmtDur(b.end)})">
+              <span class="tl2-txt">${fmtDur(secs)}</span>
+              ${can ? `<i class="tl2-h" data-tl="resize"></i>` : ""}
+            </div>
+          </div></div>`;
+      });
+    });
+    const axis = out.map((t) => `<span style="left:${pct(t)}%">${t === 0 ? "0" : fmtDur(t)}</span>`).join("");
+    const zoom = this._tlZoom || 0; // px per minute, 0 = fit to width
+    const width = zoom ? `style="--tlw:${Math.round((total / 60) * zoom)}px"` : "";
+    return `<p class="hint">${this.t("tl_hint")}</p>
+      <div class="tl2-scroll"><div class="tl2 ${zoom ? "zoomed" : ""}" ${width}>${html}
+        <div class="tl2-row axis"><span></span><div class="tl2-axis">${axis}</div></div></div></div>`;
+  }
+
+  _tlDown(e, handle) {
+    const bar = handle.closest(".tl2-bar");
+    const rect = bar.parentElement.getBoundingClientRect();
+    this._tl = { mode: handle.dataset.tl, bar, si: Number(bar.dataset.si), z: bar.dataset.z, x: e.clientX, w: rect.width,
+      total: Number(bar.dataset.total), start: Number(bar.dataset.start), secs: Number(bar.dataset.secs), moved: false };
+    try { bar.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    bar.classList.add("dragging");
+    e.preventDefault();
+  }
+
+  _tlMove(e) {
+    const d = this._tl;
+    const dx = e.clientX - d.x;
+    if (Math.abs(dx) > 3) d.moved = true;
+    const dsec = (dx / d.w) * d.total;
+    const txt = d.bar.querySelector(".tl2-txt");
+    if (d.mode === "resize") {
+      d.newSecs = Math.max(30, Math.round((d.secs + dsec) / 30) * 30);
+      d.bar.style.width = `${(d.newSecs / d.total) * 100}%`;
+      if (txt) txt.textContent = fmtDur(d.newSecs);
+      d.bar.dataset.tip = fmtDur(d.newSecs);
+    } else {
+      d.newStart = Math.max(0, d.start + dsec);
+      d.bar.style.transform = `translateX(${dx}px)`;
+      d.bar.dataset.tip = `${fmtDur(d.newStart)} →`;
+    }
+  }
+
+  _tlUp() {
+    const d = this._tl;
+    this._tl = null;
+    d.bar.classList.remove("dragging");
+    delete d.bar.dataset.tip;
+    if (!d.moved) { d.bar.style.transform = ""; return; }
+    const st = this._edit.steps[d.si];
+    const g = st && this._group(st.group_id);
+    if (!g) return;
+    if (d.mode === "resize") {
+      const factor = this._tlFactor() || 1;
+      const minutes = Math.max(0.5, Math.round((d.newSecs / 60 / factor) * 2) / 2);
+      if (st.duration_mode !== "custom") {
+        st.duration_mode = "custom";
+        g.zone_ids.forEach((z) => { if (st.durations[z] === undefined) st.durations[z] = st.duration; });
+        this._toast(this.t("tl_mode_switched", { g: g.name }));
+      }
+      st.durations[d.z] = minutes;
+    } else {
+      const { plan, sim } = this._tlData;
+      const others = sim.bars.filter((b) => plan[b.step].si === d.si && b.zone_id !== d.z).sort((a, b) => a.start - b.start);
+      const before = others.find((b) => b.start > d.newStart);
+      const order = this._stepOrder(st, g).filter((z) => z !== d.z);
+      const idx = before ? order.indexOf(before.zone_id) : order.length;
+      order.splice(idx < 0 ? order.length : idx, 0, d.z);
+      st.order = order;
+    }
+    this._dirty = true;
+    this._render();
+  }
+
+  _tlCancel() {
+    const d = this._tl;
+    this._tl = null;
+    if (d) { d.bar.classList.remove("dragging"); d.bar.style.transform = ""; this._refreshPreview(); }
   }
 
   _refreshPreview() {
     const el = this.shadowRoot.getElementById("editor-preview");
     if (el) el.innerHTML = this._previewHtml();
+    const tl = this.shadowRoot.getElementById("tl-body");
+    if (tl && !this._tl) tl.innerHTML = this._timelineHtml();
     const foot = this.shadowRoot.querySelector(".sticky-foot .muted");
     if (foot) foot.innerHTML = `<ha-icon icon="mdi:circle-medium" style="color:var(--ski-amber)"></ha-icon>${this.t("unsaved")}`;
   }
@@ -1464,6 +1589,17 @@ class SkIrrigationPanel extends HTMLElement {
         break;
       }
       case "groups-from-areas": this._groupsFromAreas(); break;
+      case "tl-zoom": {
+        const levels = [0, 4, 8, 16, 32, 64];
+        const v = Number(el.dataset.v);
+        let i = levels.indexOf(this._tlZoom || 0);
+        i = v === 0 ? 0 : Math.max(0, Math.min(levels.length - 1, i + v));
+        this._tlZoom = levels[i];
+        const body = this.shadowRoot.getElementById("tl-body");
+        if (body) body.innerHTML = this._timelineHtml();
+        this.shadowRoot.querySelectorAll(".tl-zoom button").forEach((b) => b.classList.toggle("on", b.dataset.v === "0" && !this._tlZoom));
+        return;
+      }
       case "cond-val": {
         const scope = el.dataset.scope;
         const c = this._condList(scope)[n];
@@ -1768,6 +1904,8 @@ class SkIrrigationPanel extends HTMLElement {
   // ------------------------------------------------------------ drag & drop
   _onPointerDown(e) {
     if (e.button > 0) return;
+    const tlHandle = e.target.closest("[data-tl]");
+    if (tlHandle) { this._tlDown(e, tlHandle); return; }
     const el = e.target.closest("[data-drag]");
     if (!el || e.target.closest("button, input, select, label, a")) return;
     if (el.hasAttribute("data-handle-only") && !e.target.closest(".grip")) return;
@@ -1775,6 +1913,7 @@ class SkIrrigationPanel extends HTMLElement {
   }
 
   _onPointerMove(e) {
+    if (this._tl) { this._tlMove(e); return; }
     const d = this._drag;
     if (!d) return;
     if (!d.started) {
@@ -1829,6 +1968,7 @@ class SkIrrigationPanel extends HTMLElement {
   }
 
   _onPointerUp() {
+    if (this._tl) { this._tlUp(); return; }
     const d = this._drag;
     this._drag = null;
     if (!d || !d.started) return;

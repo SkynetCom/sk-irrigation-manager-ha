@@ -57,8 +57,8 @@ Sensores de lluvia, mm acumulados, clima, helada, energía solar o batería, o c
 </td>
 <td valign="top">
 
-### 📊 Vista previa Gantt
-Antes de guardar, ves la duración estimada, los litros y la línea de tiempo exacta de cada aspersor.
+### 📊 Línea de tiempo interactiva
+Ves cada aspersor en un Gantt y lo ajustás **arrastrando**: el borde cambia el tiempo y la barra cambia el orden. Con zoom para ciclos largos y la duración y los litros en vivo.
 
 </td>
 <td valign="top">
@@ -86,6 +86,27 @@ Válvula maestra o bomba, límite hidráulico de aspersores simultáneos, tiempo
 </table>
 
 > 💡 ¿Querés probar la interfaz sin instalar nada? Abrí [`dev/demo.html`](https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/dev/demo.html) con un servidor local (ver [Desarrollo](#-desarrollo)).
+
+## 🧩 Tarjetas para dashboards
+
+La integración trae 4 tarjetas que **se cargan solas**: no hace falta agregar recursos. Editá un dashboard → **Agregar tarjeta** → buscá **"SK Riego"**.
+
+<p align="center"><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/cards.png" alt="Tarjetas para dashboards" width="100%"></p>
+
+| Tarjeta | Qué muestra | Opciones |
+|---|---|---|
+| `custom:sk-irrigation-status-card` | Riego en curso con cuenta regresiva, aspersores activos, saltar/detener, próximo riego, condiciones, sistema y retraso por lluvia | `title`, `show_controls` |
+| `custom:sk-irrigation-programs-card` | Ciclos con horarios, duración, próximo riego, aviso si no se ejecutaría, activar y regar ahora | `title`, `show_run`, `show_disabled` |
+| `custom:sk-irrigation-groups-card` | Grupos con sus aspersores encendidos en vivo y riego rápido del grupo | `title`, `group`, `minutes`, `concurrency` |
+| `custom:sk-irrigation-zones-card` | Grilla de aspersores con estado, último riego y riego manual | `title`, `group`, `minutes` |
+
+```yaml
+type: custom:sk-irrigation-groups-card
+title: Riego del frente
+group: Jardín frontal   # nombre o id; vacío = todos
+minutes: [5, 10, 15]
+concurrency: 2
+```
 
 ## 🚀 Instalación
 
@@ -251,7 +272,7 @@ Si SK Irrigation Manager te ahorra agua y tiempo, podés invitarme un café para
 - **Programs** with multiple start times per day (fixed, sunrise or sunset), weekdays, every N days, days of the month, odd or even days, specific dates and active months.
 - **Per-step activation**: sequential, or 2, 3, 4 or N sprinklers at once, using a rolling queue. **Same-for-all or per-sprinkler** durations, in a custom order.
 - **Smart conditions** (state, numeric or Jinja template), global or per program. They can optionally be **re-checked before each sprinkler and while watering**, which suits rain totals or solar/battery protection.
-- **Gantt preview**, live dashboard, water budget (global, per program or from a sensor such as Smart Irrigation), master valve or pump, global concurrency limit, history, notifications and JSON backup.
+- **Interactive Gantt timeline** (drag to adjust times and order), **dashboard cards**, live dashboard, water budget (global, per program or from a sensor such as Smart Irrigation), master valve or pump, global concurrency limit, history, notifications and JSON backup.
 - **Rain Bird native**: exact durations through `rainbird.start_irrigation`.
 
 **Like it?** [Buy me a coffee via PayPal](https://www.paypal.com/donate/?business=gerencia%40skynetcom.com.ar&currency_code=USD&item_name=SK+Irrigation+Manager) ☕

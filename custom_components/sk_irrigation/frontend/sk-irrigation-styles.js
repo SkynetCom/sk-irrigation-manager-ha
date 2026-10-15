@@ -293,6 +293,43 @@ label.field > span { padding-left: 2px; }
 .donate-btn { background: #ffdd00; border-color: #e6c200; color: #222; text-decoration: none; font-weight: 600; }
 .donate-btn:hover { background: #ffe433; }
 
+/* interactive timeline */
+.tl-card { border-top: 4px solid var(--ski-water); }
+.editor > *, .editor .stack > *, .tl-card, .tl-card .bd { min-width: 0; }
+.tl2-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; padding-top: 22px; margin-top: -14px; }
+.tl2 { display: flex; flex-direction: column; gap: 4px; user-select: none; -webkit-user-select: none; }
+.tl2.zoomed { width: max-content; }
+.tl2.zoomed .tl2-row { grid-template-columns: 170px var(--tlw); }
+.tl2.zoomed .tl2-lab, .tl2.zoomed .tl2-step { position: sticky; left: 0; z-index: 2; background: var(--ski-card); }
+.tl2.zoomed .tl2-step { width: max-content; padding-right: 12px; }
+.tl-zoom { margin-left: 4px; }
+.tl-zoom button { padding: 4px 8px; display: inline-flex; }
+.tl-zoom ha-icon { --mdc-icon-size: 18px; }
+.tl2-step { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; margin: 10px 0 2px; }
+.tl2-step:first-child { margin-top: 0; }
+.tl2-step .muted { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.tl2-step .dot { width: 9px; height: 9px; border-radius: 50%; }
+.tl2-row { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 10px; align-items: center; }
+.tl2-lab { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl2-track { position: relative; height: 30px; border-radius: 8px; background-color: rgba(127,127,127,.06);
+  background-image: linear-gradient(to right, color-mix(in srgb, var(--ski-line) 100%, transparent) 1px, transparent 1px); }
+.tl2-bar { position: absolute; top: 3px; bottom: 3px; min-width: 8px; border-radius: 6px; background: var(--c); color: #fff;
+  display: flex; align-items: center; overflow: visible; cursor: grab; touch-action: none; box-shadow: 0 1px 3px rgba(0,0,0,.18);
+  transition: box-shadow .15s; }
+.tl2-bar:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 40%, transparent), 0 2px 8px rgba(0,0,0,.2); }
+.tl2-bar.ro { cursor: default; }
+.tl2-bar.dragging { cursor: grabbing; z-index: 5; box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 45%, transparent), 0 6px 16px rgba(0,0,0,.25); transition: none; }
+.tl2-txt { font-size: 11.5px; font-weight: 600; padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: clip; pointer-events: none; flex: 1; }
+.tl2-h { position: absolute; right: -4px; top: -3px; bottom: -3px; width: 12px; cursor: ew-resize; touch-action: none; border-radius: 4px; }
+.tl2-h::after { content: ""; position: absolute; right: 4px; top: 7px; bottom: 7px; width: 3px; border-radius: 2px; background: rgba(255,255,255,.85); }
+.tl2-bar[data-tip]::before { content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); right: 0; background: #222; color: #fff;
+  font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; white-space: nowrap; pointer-events: none; }
+.tl2-row.axis { margin-top: 2px; }
+.tl2-axis { position: relative; height: 18px; font-size: 11px; color: var(--ski-muted); }
+.tl2-axis span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.tl2-axis span:first-child { transform: none; }
+@media (max-width: 600px) { .tl2-row { grid-template-columns: 90px minmax(0, 1fr); } .tl2.zoomed .tl2-row { grid-template-columns: 90px var(--tlw); } }
+
 /* conditions */
 .cond-card { border: 1px solid var(--ski-line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: rgba(127,127,127,.03); }
 .cond-card .cond-label { flex: 1; min-width: 160px; font-weight: 600; }
