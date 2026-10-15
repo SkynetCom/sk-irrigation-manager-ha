@@ -1,13 +1,12 @@
 // SK Irrigation Manager — Home Assistant panel.
 // Dependency-free web component: renders with template strings, uses event
 // delegation, and implements pointer-based drag & drop (mouse + touch).
-import { I18N } from "./sk-irrigation-i18n.js";
-import { STYLES } from "./sk-irrigation-styles.js";
+import { I18N } from "./sk-irrigation-i18n.js?v=1.1.0";
+import { STYLES } from "./sk-irrigation-styles.js?v=1.1.0";
 
 const DOMAIN = "sk_irrigation";
 const TABS = [
   ["dashboard", "mdi:view-dashboard-outline"],
-  ["zones", "mdi:sprinkler"],
   ["groups", "mdi:vector-arrange-below"],
   ["programs", "mdi:calendar-clock"],
   ["settings", "mdi:cog-outline"],
@@ -86,6 +85,7 @@ class SkIrrigationPanel extends HTMLElement {
     }
     this._tab = "dashboard";
     try { this._tab = localStorage.getItem("ski-tab") || "dashboard"; } catch (e) { /* ignore */ }
+    if (!TABS.some(([k]) => k === this._tab)) this._tab = "dashboard";
     this._edit = null;
     this._dialog = null;
     this._saveTimers = {};
@@ -209,7 +209,8 @@ class SkIrrigationPanel extends HTMLElement {
     clearTimeout(this._saveTimers[key]);
     this._saveTimers[key] = setTimeout(async () => {
       delete this._saveTimers[key];
-      const res = await this._ws({ type: `${DOMAIN}/save`, key, value: this._config[key] });
+      const value = key === "layout" ? { zones: this._config.zones, groups: this._config.groups } : this._config[key];
+      const res = await this._ws({ type: `${DOMAIN}/save`, key, value });
       if (!Object.keys(this._saveTimers).length) this._config = res.config;
       this._toast(this.t("saved"));
       if (render) this._render();
@@ -244,7 +245,9 @@ class SkIrrigationPanel extends HTMLElement {
     return (program.steps || []).map((step) => {
       const g = this._group(step.group_id);
       if (!g) return null;
-      const zones = g.zone_ids.map((zid) => this._zone(zid)).filter((z) => z && z.enabled && z.entity_id).map((z) => {
+      const skip = new Set(step.skip || []);
+      const zones = this._stepOrder(step, g).filter((zid) => !skip.has(zid)).map((zid) => this._zone(zid))
+        .filter((z) => z && z.enabled && z.entity_id).map((z) => {
         let minutes = step.duration_mode === "custom" ? (step.durations?.[z.id] ?? step.duration) : step.duration;
         minutes = Math.min(Number(minutes) || 0, maxMin);
         return { zone_id: z.id, name: z.name, color: z.color, seconds: Math.round(minutes * 60 * factor) };
@@ -436,7 +439,7 @@ class SkIrrigationPanel extends HTMLElement {
     const stats = this._state.zone_stats || {};
     if (!this._zones.length) {
       return `<div class="card"><div class="empty"><ha-icon icon="mdi:sprinkler"></ha-icon>${this.t("no_zones")}
-        <div style="margin-top:12px"><button class="btn primary" data-action="tab" data-id="zones">${this.t("tab_zones")}</button></div></div></div>`;
+        <div style="margin-top:12px"><button class="btn primary" data-action="tab" data-id="groups">${this.t("tab_groups")}</button></div></div></div>`;
     }
     return `<div class="card"><div class="hd"><h2><ha-icon icon="mdi:sprinkler"></ha-icon>${this.t("zones")}</h2>
       <span class="muted small">${this._zones.length}</span></div>
@@ -505,77 +508,101 @@ class SkIrrigationPanel extends HTMLElement {
     </div></div>`;
   }
 
-  // ------------------------------------------------------------ zones tab
-  _render_zones() {
-    const used = new Set(this._zones.map((z) => z.entity_id));
-    const q = this._search.toLowerCase();
-    const cands = (this._candidates || []).filter((c) =>
-      (this._domain === "all" || c.domain === this._domain || (this._domain === "rainbird" && c.platform === "rainbird")) &&
-      (!q || c.name.toLowerCase().includes(q) || c.entity_id.includes(q)));
-    const rbFree = (this._candidates || []).filter((c) => c.platform === "rainbird" && !used.has(c.entity_id));
-    const domains = ["all", "rainbird", "switch", "valve", "input_boolean", "light", "fan"];
-    return `<div class="grid" style="grid-template-columns:minmax(280px,380px) minmax(0,1fr);align-items:start" id="zones-grid">
-      <div class="card"><div class="hd"><h2><ha-icon icon="mdi:devices"></ha-icon>${this.t("devices")}</h2></div><div class="bd">
-        <p class="hint">${this.t("devices_hint")}</p>
-        <input type="text" placeholder="${this.t("search")}" value="${esc(this._search)}" data-bind="search">
-        <div class="chips" style="margin:10px 0">${domains.map((d) => `<button class="chip ${this._domain === d ? "on" : ""}" data-action="domain" data-id="${d}">
-          ${d === "all" ? this.t("all_domains") : d === "rainbird" ? "Rain Bird" : d}</button>`).join("")}</div>
-        ${rbFree.length && this._can() ? `<button class="btn primary" style="width:100%;justify-content:center;margin-bottom:8px" data-action="add-all-rainbird">
-          <ha-icon icon="mdi:plus-box-multiple"></ha-icon>${this.t("add_all_rainbird")} (${rbFree.length})</button>` : ""}
-        <div class="device-list" id="device-list">${this._deviceListHtml(cands, used)}</div>
-      </div></div>
-      <div class="card"><div class="hd"><h2><ha-icon icon="mdi:sprinkler"></ha-icon>${this.t("configured_zones")}</h2>
-        <span class="badge">${this._zones.length}</span></div><div class="bd zone-list">
-        ${this._zones.length ? this._zones.map((z) => `<div class="zone-row">
-          <input class="z-c" type="color" value="${esc(z.color)}" data-bind="zone:${z.id}:color" ${this._can() ? "" : "disabled"}>
-          <input class="z-n" type="text" value="${esc(z.name)}" data-bind="zone:${z.id}:name" placeholder="${this.t("zone_name")}" ${this._can() ? "" : "disabled"}>
-          <select class="z-e" data-bind="zone:${z.id}:entity_id" ${this._can() ? "" : "disabled"}>${this._entityOptions(["switch", "valve", "input_boolean", "light", "fan"], z.entity_id)}</select>
-          <input class="z-f" type="number" min="0" step="0.1" value="${z.flow_rate ?? ""}" placeholder="${this.t("flow_rate")}" title="${this.t("flow_rate")}" data-bind="zone:${z.id}:flow_rate" ${this._can() ? "" : "disabled"}>
-          <label class="switch z-s" title="${this.t("enabled")}"><input type="checkbox" data-bind="zone:${z.id}:enabled" ${z.enabled ? "checked" : ""} ${this._can() ? "" : "disabled"}><span class="tr"></span></label>
-          <div class="row z-a" style="gap:2px">${this._can() ? `
-            <button class="btn icon" title="${this.t("test")}" data-action="test-zone" data-id="${z.id}"><ha-icon icon="mdi:play-circle-outline"></ha-icon></button>
-            <button class="btn icon" title="${this.t("delete")}" data-action="delete-zone" data-id="${z.id}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>` : ""}</div>
-        </div>`).join("") : `<div class="empty"><ha-icon icon="mdi:sprinkler"></ha-icon>${this.t("no_zones")}</div>`}
-      </div></div>
-    </div>`;
+  // ------------------------------------------------------------ sprinklers & groups
+  // Sprinklers are the HA devices themselves: dragging a device into a group
+  // creates its sprinkler record on the fly, so there is no separate setup step.
+  _devices() {
+    const byEntity = new Map((this._candidates || []).map((c) => [c.entity_id, { ...c }]));
+    this._zones.forEach((z) => {
+      if (z.entity_id && !byEntity.has(z.entity_id)) {
+        byEntity.set(z.entity_id, { entity_id: z.entity_id, name: z.name, domain: z.entity_id.split(".")[0], platform: null, area: null, missing: true });
+      }
+    });
+    return [...byEntity.values()];
   }
 
-  _deviceListHtml(cands, used) {
-    return cands.map((c) => `<div class="device">
-      <ha-icon icon="${esc(c.icon || (c.domain === "valve" ? "mdi:valve" : "mdi:sprinkler"))}" style="color:var(--ski-muted)"></ha-icon>
-      <div class="nm"><div>${esc(c.name)}</div><div class="small muted">${esc(c.entity_id)}</div></div>
-      ${c.platform === "rainbird" ? `<span class="badge rb">Rain Bird</span>` : ""}
-      ${used.has(c.entity_id) ? `<span class="badge green">${this.t("in_use")}</span>`
-        : this._can() ? `<button class="btn icon" data-action="add-device" data-id="${esc(c.entity_id)}"><ha-icon icon="mdi:plus-circle-outline"></ha-icon></button>` : ""}
-    </div>`).join("") || `<div class="empty">—</div>`;
+  _zoneByEntity(entityId) { return this._zones.find((z) => z.entity_id === entityId); }
+
+  _ensureZone(entityId) {
+    return this._zoneByEntity(entityId) || this._addZone(entityId);
   }
 
   _addZone(entityId) {
     const c = (this._candidates || []).find((x) => x.entity_id === entityId);
-    const name = (c?.name || this._entityName(entityId)).replace(/^Rain ?Bird\s*/i, "");
-    this._config.zones.push({
+    const name = (c?.name || this._entityName(entityId)).replace(/^Rain ?Bird\s*/i, "") || entityId;
+    const zone = {
       id: uid("zone"), name, entity_id: entityId, icon: "mdi:sprinkler", enabled: true, flow_rate: null, notes: "",
       color: PALETTE[this._config.zones.length % PALETTE.length],
+    };
+    this._config.zones.push(zone);
+    return zone;
+  }
+
+  _groupCounts() {
+    const counts = {};
+    this._groups.forEach((g) => g.zone_ids.forEach((z) => { counts[z] = (counts[z] || 0) + 1; }));
+    return counts;
+  }
+
+  _filteredDevices() {
+    const q = this._search.toLowerCase();
+    const counts = this._groupCounts();
+    const f = this._domain;
+    return this._devices().filter((c) => {
+      const zone = this._zoneByEntity(c.entity_id);
+      if (f === "rainbird" && c.platform !== "rainbird") return false;
+      if (f === "unassigned" && zone && counts[zone.id]) return false;
+      if (f.startsWith("area:") && c.area !== f.slice(5)) return false;
+      if (f.startsWith("domain:") && c.domain !== f.slice(7)) return false;
+      const name = (zone?.name || c.name).toLowerCase();
+      return !q || name.includes(q) || c.entity_id.includes(q) || (c.area || "").toLowerCase().includes(q);
     });
   }
 
-  // ------------------------------------------------------------ groups tab
-  _render_groups() {
-    const counts = {};
-    this._groups.forEach((g) => g.zone_ids.forEach((z) => { counts[z] = (counts[z] || 0) + 1; }));
+  _poolItemsHtml() {
+    const counts = this._groupCounts();
     const can = this._can();
+    const items = this._filteredDevices();
+    if (!items.length) return `<div class="empty">—</div>`;
+    return items.map((c) => {
+      const z = this._zoneByEntity(c.entity_id);
+      const n = z ? counts[z.id] || 0 : 0;
+      return `<div class="zchip dev ${n ? "" : "free"}" ${can ? `data-drag="${attr({ t: "dev", e: c.entity_id })}"` : ""}>
+        <ha-icon class="grip" icon="mdi:drag-vertical"></ha-icon>
+        <span class="swatch" style="background:${z ? esc(z.color) : "rgba(127,127,127,.35)"}"></span>
+        <div class="nm" title="${esc(c.entity_id)}"><div>${esc(z?.name || c.name)}</div>
+          <div class="small muted sub">${c.platform === "rainbird" ? `<span class="badge rb">Rain Bird</span>` : ""}
+            ${c.missing ? `<span class="badge red">${this.t("missing")}</span>` : ""}
+            ${z && !z.enabled ? `<span class="badge">${this.t("program_disabled")}</span>` : ""}
+            ${c.area ? `<span><ha-icon icon="mdi:home-outline" style="--mdc-icon-size:13px"></ha-icon> ${esc(c.area)}</span>` : `<span>${esc(c.entity_id)}</span>`}</div></div>
+        ${n ? `<span class="badge green" title="${this.t("in_groups", { n })}">${n}</span>` : ""}
+        ${can ? `<button class="btn icon" title="${this.t("edit_sprinkler")}" data-action="edit-dev" data-id="${esc(c.entity_id)}"><ha-icon icon="mdi:pencil-outline" style="--mdc-icon-size:18px"></ha-icon></button>` : ""}
+      </div>`;
+    }).join("");
+  }
+
+  _render_groups() {
+    const can = this._can();
+    const devices = this._devices();
+    const areas = [...new Set(devices.map((d) => d.area).filter(Boolean))].sort();
+    const filters = [["all", this.t("all_domains")], ["unassigned", this.t("unassigned")]];
+    if (devices.some((d) => d.platform === "rainbird")) filters.push(["rainbird", "Rain Bird"]);
+    areas.forEach((a) => filters.push([`area:${a}`, a]));
     return `<p class="hint">${this.t("groups_hint")}</p>
     <div class="groups-layout">
-      <div class="card pool"><div class="hd"><h2><ha-icon icon="mdi:sprinkler"></ha-icon>${this.t("zones")}</h2></div>
-        <div class="bd"><div class="dropzone" data-drop="pool" data-accept="zone">
-        ${this._zones.length ? this._zones.map((z) => `<div class="zchip" style="--c:${esc(z.color)}" ${can ? `data-drag="${attr({ t: "zone", z: z.id, from: null })}"` : ""}>
-          <ha-icon class="grip" icon="mdi:drag-vertical"></ha-icon><span class="swatch" style="background:${esc(z.color)}"></span>
-          <span class="nm">${esc(z.name)}</span><span class="small muted">${counts[z.id] ? this.t("in_groups", { n: counts[z.id] }) : ""}</span></div>`).join("")
-        : `<div class="empty">${this.t("no_zones")}</div>`}
-        </div></div></div>
+      <div class="card pool"><div class="hd"><h2><ha-icon icon="mdi:sprinkler"></ha-icon>${this.t("sprinklers_pool")}</h2>
+        <span class="badge">${devices.length}</span></div>
+        <div class="bd">
+          <input type="text" placeholder="${this.t("search")}" value="${esc(this._search)}" data-bind="search">
+          <div class="chips" style="margin:10px 0">${filters.map(([k, label]) => `<button class="chip ${this._domain === k ? "on" : ""}" data-action="domain" data-id="${esc(k)}">
+            ${k.startsWith("area:") ? `<ha-icon icon="mdi:home-outline" style="--mdc-icon-size:14px"></ha-icon>` : ""}${esc(label)}</button>`).join("")}</div>
+          ${can && areas.length ? `<button class="btn" style="width:100%;justify-content:center;margin-bottom:10px" data-action="groups-from-areas">
+            <ha-icon icon="mdi:home-group-plus"></ha-icon>${this.t("from_areas")}</button>` : ""}
+          <div class="dropzone" id="pool-list" data-drop="pool" data-accept="zone">${this._poolItemsHtml()}</div>
+        </div></div>
       <div class="group-grid">
         ${this._groups.map((g) => this._groupCardHtml(g)).join("")}
-        ${can ? `<div class="new-group" data-drop="new-group" data-accept="zone" data-action="new-group">
+        ${can ? `<div class="new-group" data-drop="new-group" data-accept="zone,dev" data-action="new-group">
           <div><ha-icon icon="mdi:plus-circle-outline" style="--mdc-icon-size:34px"></ha-icon><div><b>${this.t("new_group")}</b></div>
           <div class="small">${this.t("drop_new_group")}</div></div></div>` : ""}
       </div>
@@ -584,7 +611,8 @@ class SkIrrigationPanel extends HTMLElement {
 
   _groupCardHtml(g) {
     const can = this._can();
-    const free = this._zones.filter((z) => !g.zone_ids.includes(z.id));
+    const inGroup = new Set(g.zone_ids.map((z) => this._zone(z)?.entity_id));
+    const free = this._devices().filter((d) => !inGroup.has(d.entity_id));
     return `<div class="card group-card" style="--c:${esc(g.color)}">
       <div class="hd">
         <input type="color" value="${esc(g.color)}" data-bind="group:${g.id}:color" ${can ? "" : "disabled"}>
@@ -593,7 +621,7 @@ class SkIrrigationPanel extends HTMLElement {
         <button class="btn icon" title="${this.t("delete")}" data-action="delete-group" data-id="${g.id}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>` : ""}
       </div>
       <div class="bd">
-        <div class="dropzone ${g.zone_ids.length ? "" : "empty-dz"}" data-drop="group:${g.id}" data-accept="zone">
+        <div class="dropzone ${g.zone_ids.length ? "" : "empty-dz"}" data-drop="group:${g.id}" data-accept="zone,dev">
           ${g.zone_ids.length ? g.zone_ids.map((zid, i) => {
             const z = this._zone(zid);
             if (!z) return "";
@@ -603,9 +631,22 @@ class SkIrrigationPanel extends HTMLElement {
           }).join("") : this.t("drop_here")}
         </div>
         ${can && free.length ? `<select style="margin-top:8px" data-bind="group-add:${g.id}"><option value="">＋ ${this.t("add_zone_to_group")}</option>
-          ${free.map((z) => `<option value="${z.id}">${esc(z.name)}</option>`).join("")}</select>` : ""}
+          ${free.map((d) => `<option value="${esc(d.entity_id)}">${esc(this._zoneByEntity(d.entity_id)?.name || d.name)}${d.area ? ` (${esc(d.area)})` : ""}</option>`).join("")}</select>` : ""}
         <div class="small muted" style="margin-top:8px">${g.zone_ids.length} ${this.t("zones_lc")}</div>
       </div></div>`;
+  }
+
+  _groupsFromAreas() {
+    const byArea = {};
+    this._devices().forEach((d) => { if (d.area && !d.missing) (byArea[d.area] = byArea[d.area] || []).push(d.entity_id); });
+    let created = 0;
+    Object.entries(byArea).forEach(([area, entities]) => {
+      let g = this._groups.find((x) => x.name.toLowerCase() === area.toLowerCase());
+      if (!g) { g = this._createGroup([], area); created += 1; }
+      entities.forEach((e) => { const z = this._ensureZone(e); if (!g.zone_ids.includes(z.id)) g.zone_ids.push(z.id); });
+    });
+    this._queueSave("layout");
+    this._toast(this.t("areas_created", { n: created }));
   }
 
   // ------------------------------------------------------------ programs tab
@@ -753,39 +794,62 @@ class SkIrrigationPanel extends HTMLElement {
       </div>`;
   }
 
+  _stepOrder(st, g) {
+    const ordered = (st.order || []).filter((z) => g.zone_ids.includes(z));
+    return ordered.concat(g.zone_ids.filter((z) => !ordered.includes(z)));
+  }
+
   _stepHtml(st, i) {
     const g = this._group(st.group_id);
     if (!g) return "";
-    const zones = g.zone_ids.map((z) => this._zone(z)).filter(Boolean);
+    const order = this._stepOrder(st, g).map((z) => this._zone(z)).filter(Boolean);
+    const skip = new Set(st.skip || []);
+    const custom = st.duration_mode === "custom";
     const conc = st.concurrency;
     const preset = [1, 2, 3, 4, 0];
+    let n = 0;
     return `<div class="step-card" style="--c:${esc(g.color)}" data-drag="${attr({ t: "step", i })}" data-handle-only>
       <div class="shd">
         <ha-icon class="grip" icon="mdi:drag-horizontal-variant"></ha-icon>
         <span class="section-n" style="background:${esc(g.color)}">${i + 1}</span>
-        <span class="t">${esc(g.name)} <span class="small muted">· ${zones.length} ${this.t("zones_lc")}</span></span>
+        <span class="t">${esc(g.name)} <span class="small muted">· ${order.length - skip.size} ${this.t("zones_lc")}</span></span>
         <button class="btn icon" data-action="move-step" data-n="${i}" data-dir="-1" ${i === 0 ? "disabled" : ""}><ha-icon icon="mdi:chevron-up"></ha-icon></button>
         <button class="btn icon" data-action="move-step" data-n="${i}" data-dir="1" ${i === this._edit.steps.length - 1 ? "disabled" : ""}><ha-icon icon="mdi:chevron-down"></ha-icon></button>
         <button class="btn icon" data-action="del-step" data-n="${i}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>
       </div>
       <div class="sbd">
         <div><div class="sub">${this.t("activation")}</div>
-          <div class="row wrap"><div class="seg">${preset.map((n) => `<button class="${conc === n ? "on" : ""}" data-action="step-conc" data-n="${i}" data-v="${n}">
-            ${n === 1 ? `${this.t("sequential")}` : n === 0 ? this.t("all") : `${n} ${this.t("at_once")}`}</button>`).join("")}
+          <div class="row wrap"><div class="seg">${preset.map((v) => `<button class="${conc === v ? "on" : ""}" data-action="step-conc" data-n="${i}" data-v="${v}">
+            ${v === 1 ? this.t("sequential") : v === 0 ? this.t("all") : `${v} ${this.t("at_once")}`}</button>`).join("")}
             <button class="${preset.includes(conc) ? "" : "on"}" data-action="step-conc" data-n="${i}" data-v="5">${this.t("custom")}</button></div>
             ${preset.includes(conc) ? "" : `<input type="number" min="1" max="64" value="${conc}" data-bind="step:${i}:concurrency">`}
           </div></div>
         <div><div class="sub">${this.t("timing")}</div>
           <div class="row wrap"><div class="seg">
-            <button class="${st.duration_mode !== "custom" ? "on" : ""}" data-action="step-mode" data-n="${i}" data-v="uniform">${this.t("uniform")}</button>
-            <button class="${st.duration_mode === "custom" ? "on" : ""}" data-action="step-mode" data-n="${i}" data-v="custom">${this.t("per_zone")}</button></div>
-            <input type="number" min="0" max="600" step="0.5" value="${st.duration}" data-bind="step:${i}:duration"> <span class="muted">${this.t("min")}</span>
-            ${st.duration_mode === "custom" ? `<button class="btn sm" data-action="step-apply" data-n="${i}">${this.t("apply_all")}</button>` : ""}
+            <button class="${custom ? "" : "on"}" data-action="step-mode" data-n="${i}" data-v="uniform">${this.t("uniform")}</button>
+            <button class="${custom ? "on" : ""}" data-action="step-mode" data-n="${i}" data-v="custom">${this.t("per_zone")}</button></div>
+            ${custom ? `<input type="number" min="0" max="600" step="0.5" value="${st.duration}" data-bind="step:${i}:duration" title="${this.t("apply_all")}">
+              <button class="btn sm" data-action="step-apply" data-n="${i}"><ha-icon icon="mdi:arrow-down-bold-box-outline"></ha-icon>${this.t("apply_all")}</button>`
+              : `<input type="number" min="0" max="600" step="0.5" value="${st.duration}" data-bind="step:${i}:duration"> <span class="muted">${this.t("min")} ${this.t("each")}</span>`}
+          </div></div>
+        <div><div class="sub">${this.t("order_timing")}</div>
+          <p class="hint" style="margin:0 0 8px">${this.t("order_hint")}</p>
+          <div class="dropzone srows" data-drop="steporder:${i}" data-accept="szone">
+          ${order.map((z) => {
+            const off = skip.has(z.id);
+            if (!off) n += 1;
+            const minutes = custom ? (st.durations[z.id] ?? st.duration) : st.duration;
+            return `<div class="srow ${off ? "off" : ""}" data-drag="${attr({ t: "szone", s: i, z: z.id })}" data-handle-only>
+              <ha-icon class="grip" icon="mdi:drag-vertical"></ha-icon>
+              <span class="ord" style="background:${off ? "rgba(127,127,127,.4)" : esc(g.color)}">${off ? "–" : n}</span>
+              <span class="swatch" style="background:${esc(z.color)}"></span>
+              <span class="nm">${esc(z.name)}</span>
+              ${custom && !off ? `<input type="number" min="0" max="600" step="0.5" value="${minutes}" data-bind="stepdur:${i}:${z.id}"><span class="muted small">${this.t("min")}</span>`
+                : `<span class="muted small tnum" style="min-width:64px;text-align:right">${off ? this.t("omitted") : `${minutes} ${this.t("min")}`}</span>`}
+              <label class="switch" title="${this.t("include")}"><input type="checkbox" data-bind="stepskip:${i}:${z.id}" ${off ? "" : "checked"}><span class="tr"></span></label>
+            </div>`;
+          }).join("")}
           </div>
-          ${st.duration_mode === "custom" ? `<div class="dur-table" style="margin-top:10px">${zones.map((z, zi) => `
-            <span class="row"><span class="ord" style="width:20px;height:20px;border-radius:50%;background:${esc(z.color)};color:#fff;font-size:11px;display:grid;place-items:center">${zi + 1}</span>${esc(z.name)}</span>
-            <span class="row"><input type="number" min="0" max="600" step="0.5" value="${st.durations[z.id] ?? st.duration}" data-bind="stepdur:${i}:${z.id}"><span class="muted small">${this.t("min")}</span></span>`).join("")}
-            <span class="small muted" style="grid-column:1/-1">${this.t("omit_hint")}</span></div>` : ""}
         </div>
       </div></div>`;
   }
@@ -892,6 +956,25 @@ class SkIrrigationPanel extends HTMLElement {
   // ------------------------------------------------------------ dialogs
   _dialogHtml() {
     const d = this._dialog;
+    if (d.type === "zone") {
+      const dev = this._devices().find((x) => x.entity_id === d.entity_id) || {};
+      const z = d.draft;
+      return `<div class="scrim" data-action="dlg-cancel"><div class="dialog" data-stop>
+        <h2 class="row"><ha-icon icon="mdi:sprinkler"></ha-icon>${this.t("edit_sprinkler")}</h2>
+        <div class="small muted">${esc(d.entity_id)}${dev.area ? ` · ${esc(dev.area)}` : ""}${dev.platform === "rainbird" ? ` · Rain Bird` : ""}</div>
+        <div class="row"><input type="color" value="${esc(z.color)}" data-bind="dlgz:color">
+          <input type="text" value="${esc(z.name)}" data-bind="dlgz:name" placeholder="${this.t("zone_name")}"></div>
+        <div class="row wrap"><label class="field" style="flex:1"><span>${this.t("flow_rate")}</span>
+          <input type="number" min="0" step="0.1" value="${z.flow_rate ?? ""}" data-bind="dlgz:flow_rate" style="max-width:none"></label>
+          <div class="row" style="margin-top:18px"><label class="switch"><input type="checkbox" data-bind="dlgz:enabled" ${z.enabled ? "checked" : ""}><span class="tr"></span></label>${this.t("enabled")}</div></div>
+        <div class="foot" style="justify-content:space-between;flex-wrap:wrap">
+          <div class="row" style="gap:6px">
+            <button class="btn sm" data-action="zone-test"><ha-icon icon="mdi:play-circle-outline"></ha-icon>${this.t("test")}</button>
+            ${d.isNew ? "" : `<button class="btn sm danger" data-action="zone-delete"><ha-icon icon="mdi:delete-outline"></ha-icon>${this.t("remove_sprinkler")}</button>`}</div>
+          <div class="row" style="gap:6px"><button class="btn" data-action="dlg-cancel">${this.t("cancel")}</button>
+          <button class="btn primary" data-action="zone-save">${this.t("save")}</button></div>
+        </div></div></div>`;
+    }
     if (d.type === "confirm") {
       return `<div class="scrim" data-action="dlg-cancel"><div class="dialog" data-stop>
         <h2>${esc(d.title || this.t("confirm"))}</h2><div>${esc(d.text)}</div>
@@ -932,7 +1015,7 @@ class SkIrrigationPanel extends HTMLElement {
         if (this._edit && this._dirty && id !== "programs") { /* keep draft */ }
         this._tab = id;
         try { localStorage.setItem("ski-tab", id); } catch (err) { /* ignore */ }
-        if (id === "zones") this._refreshCandidates();
+        if (id === "groups") this._refreshCandidates();
         break;
       case "stop": await this._action("stop"); this._toast(this.t("stopped")); break;
       case "skip": await this._action("skip", id ? { target: id } : {}); return;
@@ -958,24 +1041,43 @@ class SkIrrigationPanel extends HTMLElement {
       }
       case "rain-delay": await this._action("rain_delay", { hours: Number(el.dataset.hours) }); break;
       case "remove-queued": await this._action("remove_queued", { target: id }); break;
-      // zones
+      // sprinklers
       case "domain": this._domain = id; break;
-      case "add-device": this._addZone(id); this._queueSave("zones"); break;
-      case "add-all-rainbird": {
-        const used = new Set(this._zones.map((z) => z.entity_id));
-        this._candidates.filter((c) => c.platform === "rainbird" && !used.has(c.entity_id)).forEach((c) => this._addZone(c.entity_id));
-        this._queueSave("zones");
+      case "edit-dev": {
+        const z = this._zoneByEntity(id);
+        this._dialog = { type: "zone", entity_id: id, isNew: !z,
+          draft: z ? clone(z) : { name: (this._devices().find((d) => d.entity_id === id)?.name || id).replace(/^Rain ?Bird\s*/i, ""),
+            color: PALETTE[this._zones.length % PALETTE.length], flow_rate: null, enabled: true } };
         break;
       }
-      case "test-zone": await this._action("run_zone", { target: id, minutes: 1 }); this._toast(this.t("queued")); return;
-      case "delete-zone":
-        this._confirm(this.t("confirm_delete_zone"), async () => {
-          this._config.zones = this._zones.filter((z) => z.id !== id);
-          this._config.groups.forEach((g) => { g.zone_ids = g.zone_ids.filter((z) => z !== id); });
-          await this._ws({ type: `${DOMAIN}/save`, key: "zones", value: this._config.zones }).then((r) => { this._config = r.config; });
-          this._render();
-        }, this.t("delete"));
+      case "zone-save": {
+        const d = this._dialog;
+        this._dialog = null;
+        const z = this._ensureZone(d.entity_id);
+        Object.assign(z, { name: d.draft.name || z.name, color: d.draft.color, flow_rate: d.draft.flow_rate, enabled: d.draft.enabled });
+        this._queueSave("layout");
+        break;
+      }
+      case "zone-test": {
+        const d = this._dialog;
+        const z = this._zoneByEntity(d.entity_id);
+        if (!z) { this._ensureZone(d.entity_id); await this._saveNow("layout"); }
+        await this._action("run_zone", { target: d.entity_id, minutes: 1 });
+        this._toast(this.t("queued"));
         return;
+      }
+      case "zone-delete": {
+        const d = this._dialog;
+        const z = this._zoneByEntity(d.entity_id);
+        this._dialog = null;
+        if (z) {
+          this._config.zones = this._zones.filter((x) => x.id !== z.id);
+          this._config.groups.forEach((g) => { g.zone_ids = g.zone_ids.filter((x) => x !== z.id); });
+          this._queueSave("layout");
+        }
+        break;
+      }
+      case "groups-from-areas": this._groupsFromAreas(); break;
       // groups
       case "new-group": this._createGroup([]); break;
       case "delete-group":
@@ -988,7 +1090,7 @@ class SkIrrigationPanel extends HTMLElement {
       case "ungroup": {
         const g = this._group(el.dataset.group);
         g.zone_ids = g.zone_ids.filter((z) => z !== id);
-        this._queueSave("groups");
+        this._queueSave("layout");
         break;
       }
       // programs
@@ -1099,16 +1201,17 @@ class SkIrrigationPanel extends HTMLElement {
     this._dirty = true;
   }
 
-  _createGroup(zoneIds) {
-    const g = { id: uid("group"), name: `${this.t("new_group")} ${this._groups.length + 1}`,
+  _createGroup(zoneIds, name) {
+    const g = { id: uid("group"), name: name || `${this.t("new_group")} ${this._groups.length + 1}`,
       color: PALETTE[(this._groups.length + 1) % PALETTE.length], icon: "mdi:sprinkler-variant", zone_ids: zoneIds };
     this._config.groups.push(g);
-    this._queueSave("groups");
+    this._queueSave("layout");
     return g;
   }
 
   async _saveNow(key) {
-    const res = await this._ws({ type: `${DOMAIN}/save`, key, value: this._config[key] });
+    const value = key === "layout" ? { zones: this._config.zones, groups: this._config.groups } : this._config[key];
+    const res = await this._ws({ type: `${DOMAIN}/save`, key, value });
     this._config = res.config;
     this._toast(this.t("saved"));
     this._render();
@@ -1126,12 +1229,8 @@ class SkIrrigationPanel extends HTMLElement {
     const el = e.target;
     if (el.dataset.bind === "search") {
       this._search = el.value;
-      const used = new Set(this._zones.map((z) => z.entity_id));
-      const q = this._search.toLowerCase();
-      const cands = (this._candidates || []).filter((c) =>
-        (this._domain === "all" || c.domain === this._domain || (this._domain === "rainbird" && c.platform === "rainbird")) &&
-        (!q || c.name.toLowerCase().includes(q) || c.entity_id.includes(q)));
-      this.shadowRoot.getElementById("device-list").innerHTML = this._deviceListHtml(cands, used);
+      const list = this.shadowRoot.getElementById("pool-list");
+      if (list) list.innerHTML = this._poolItemsHtml();
     }
   }
 
@@ -1157,23 +1256,24 @@ class SkIrrigationPanel extends HTMLElement {
         if (v && !this._config.settings.rain_sensors.includes(v)) this._config.settings.rain_sensors.push(v);
         this._queueSave("settings");
         break;
-      case "zone": {
-        const z = this._zone(a);
-        if (b === "entity_id" && !v) v = null;
-        z[b] = v;
-        this._queueSave("zones");
-        return;
-      }
       case "group": {
         this._group(a)[b] = v;
         this._queueSave("groups", b === "color");
         return;
       }
       case "group-add": {
-        if (v) this._group(a).zone_ids.push(v);
-        this._queueSave("groups");
+        if (v) this._group(a).zone_ids.push(this._ensureZone(v).id);
+        this._queueSave("layout");
         break;
       }
+      case "stepskip": {
+        const st = this._edit.steps[Number(a)];
+        st.skip = (st.skip || []).filter((z) => z !== b);
+        if (!v) st.skip.push(b);
+        this._dirty = true;
+        break;
+      }
+      case "dlgz": this._dialog.draft[a] = v; return;
       case "import": {
         const file = el.files?.[0];
         if (!file) return;
@@ -1262,13 +1362,14 @@ class SkIrrigationPanel extends HTMLElement {
     const under = this.shadowRoot.elementFromPoint(e.clientX, e.clientY);
     let target = under?.closest("[data-drop]");
     if (target && !(target.dataset.accept || "").split(",").includes(d.data.t)) target = null;
+    if (target && d.data.t === "szone" && target.dataset.drop !== `steporder:${d.data.s}`) target = null;
     if (d.target && d.target !== target) d.target.classList.remove("over");
     d.target = target;
     d.index = null;
     d.marker.remove();
     if (target) {
       target.classList.add("over");
-      if (target.dataset.drop.startsWith("group:") || target.dataset.drop === "steps") {
+      if (target.dataset.drop.startsWith("group:") || target.dataset.drop.startsWith("steporder:") || target.dataset.drop === "steps") {
         const items = [...target.querySelectorAll(":scope > [data-drag]")];
         let idx = items.findIndex((it) => { const r = it.getBoundingClientRect(); return e.clientY < r.top + r.height / 2; });
         if (idx < 0) idx = items.length;
@@ -1315,6 +1416,23 @@ class SkIrrigationPanel extends HTMLElement {
   }
 
   _drop(data, target, index) {
+    if (data.t === "dev") {
+      if (target === "pool") return;
+      data = { t: "zone", z: this._ensureZone(data.e).id, from: null };
+    }
+    if (data.t === "szone" && target === `steporder:${data.s}`) {
+      const st = this._edit.steps[data.s];
+      const order = this._stepOrder(st, this._group(st.group_id));
+      let idx = index ?? order.length;
+      const cur = order.indexOf(data.z);
+      order.splice(cur, 1);
+      if (cur < idx) idx -= 1;
+      order.splice(idx, 0, data.z);
+      st.order = order;
+      this._dirty = true;
+      this._render();
+      return;
+    }
     if (data.t === "zone") {
       const from = data.from ? this._group(data.from) : null;
       if (target === "pool") {
@@ -1333,7 +1451,7 @@ class SkIrrigationPanel extends HTMLElement {
         g.zone_ids.splice(idx, 0, data.z);
         if (from && from !== g) from.zone_ids = from.zone_ids.filter((z) => z !== data.z);
       }
-      this._queueSave("groups");
+      this._queueSave("layout");
     } else if (data.t === "group" && target === "steps") {
       this._addStep(data.g, index ?? this._edit.steps.length);
     } else if (data.t === "step" && target === "steps") {

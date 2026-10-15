@@ -62,7 +62,7 @@ def ws_subscribe(hass: HomeAssistant, connection: websocket_api.ActiveConnection
 
 @websocket_api.websocket_command({
     vol.Required("type"): f"{DOMAIN}/save",
-    vol.Required("key"): vol.In(["zones", "groups", "programs", "settings"]),
+    vol.Required("key"): vol.In(["zones", "groups", "programs", "settings", "layout"]),
     vol.Required("value"): vol.Any(list, dict),
 })
 @websocket_api.require_admin

@@ -111,3 +111,22 @@ def test_resolve_concurrency_with_global_cap():
 def test_plan_total_includes_step_delay():
     steps = [m.PlannedStep("a", 1, [m.PlannedZone("z1", 60)]), m.PlannedStep("b", 1, [m.PlannedZone("z2", 60)])]
     assert m.estimate_plan_seconds(steps, 0, 5, 30) == 150
+
+
+def test_step_order_and_skip():
+    cfg = _cfg()
+    step = cfg["programs"][0]["steps"][0]
+    step.update({"order": ["z3", "z1", "ghost"], "skip": ["z2"]})
+    cfg = m.normalize_all(cfg)
+    step = cfg["programs"][0]["steps"][0]
+    assert step["order"] == ["z3", "z1"] and step["skip"] == ["z2"]
+    zones = {z["id"]: z for z in cfg["zones"]}
+    groups = {g["id"]: g for g in cfg["groups"]}
+    plan = m.build_program_plan(cfg["programs"][0], zones, groups, 100, 120)
+    # chosen order first, skipped zone dropped, disabled zone (z4) still excluded
+    assert [z.zone_id for z in plan[0].zones] == ["z3", "z1"]
+
+
+def test_order_keeps_new_group_members():
+    group = {"zone_ids": ["a", "b", "c"]}
+    assert m.step_zone_order({"order": ["c", "x"]}, group) == ["c", "a", "b"]

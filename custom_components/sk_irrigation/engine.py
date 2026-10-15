@@ -11,7 +11,7 @@ from typing import Any
 
 from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_change
 from homeassistant.helpers.sun import get_astral_event_date
@@ -581,16 +581,25 @@ class IrrigationEngine:
 
     # ------------------------------------------------------------ state
     def candidates(self) -> list[dict]:
+        """Every HA entity that can drive a sprinkler, with its native HA area."""
         reg = er.async_get(self.hass)
+        devices = dr.async_get(self.hass)
+        areas = ar.async_get(self.hass)
         out = []
         for state in self.hass.states.async_all(SUPPORTED_DOMAINS):
             entry = reg.async_get(state.entity_id)
+            area_id = entry.area_id if entry else None
+            if entry and not area_id and entry.device_id:
+                device = devices.async_get(entry.device_id)
+                area_id = device.area_id if device else None
+            area = areas.async_get_area(area_id) if area_id else None
             out.append({
                 "entity_id": state.entity_id,
                 "name": state.attributes.get("friendly_name", state.entity_id),
                 "domain": state.domain,
                 "platform": entry.platform if entry else None,
                 "icon": state.attributes.get("icon"),
+                "area": area.name if area else None,
             })
         return sorted(out, key=lambda c: (c["platform"] != RAINBIRD_PLATFORM, c["domain"], c["name"].lower()))
 

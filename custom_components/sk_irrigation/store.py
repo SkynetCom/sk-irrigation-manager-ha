@@ -41,10 +41,15 @@ class IrrigationStore:
         self._store.async_delay_save(self._data, SAVE_DELAY)
 
     async def async_update(self, key: str, value: Any) -> None:
-        if key not in ("zones", "groups", "programs", "settings"):
-            raise ValueError(f"Unknown key {key}")
         draft = dict(self.config)
-        draft[key] = value
+        if key == "layout":
+            # zones + groups saved together so new sprinklers and their group
+            # membership land in a single, consistent write.
+            draft.update({k: value[k] for k in ("zones", "groups") if k in value})
+        elif key in ("zones", "groups", "programs", "settings"):
+            draft[key] = value
+        else:
+            raise ValueError(f"Unknown key {key}")
         # Re-normalise everything so deleted zones/groups vanish from references.
         self.config = normalize_all(draft)
         await self._store.async_save(self._data())

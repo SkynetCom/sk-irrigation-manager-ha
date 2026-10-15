@@ -176,13 +176,26 @@ label.field > span { padding-left: 2px; }
 .zchip .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .zchip .ord { width: 22px; height: 22px; border-radius: 50%; background: var(--c, var(--ski-green)); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; flex: none; }
 .zchip:hover { border-color: color-mix(in srgb, var(--ski-primary) 50%, var(--ski-line)); }
+.zchip.dev { align-items: center; }
+.zchip.dev .nm > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zchip.dev .sub { display: flex; gap: 6px; align-items: center; margin-top: 2px; }
+.zchip.dev .sub .badge { font-size: 10px; padding: 1px 6px; }
+.zchip.dev.free { border-style: dashed; }
+#pool-list { max-height: calc(100vh - 330px); overflow: auto; padding: 4px; }
+.srows { gap: 6px; padding: 6px; background: rgba(127,127,127,.04); border-color: var(--ski-line); border-style: solid; border-width: 1px; }
+.srow { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--ski-line); background: var(--ski-card); }
+.srow .grip { color: var(--ski-muted); --mdc-icon-size: 20px; }
+.srow .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.srow input[type=number] { width: 84px; min-height: 32px; padding: 4px 8px; }
+.srow.off .nm { color: var(--ski-muted); text-decoration: line-through; }
+.ord { width: 22px; height: 22px; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; flex: none; }
 .dropzone { min-height: 56px; display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 12px; border: 2px dashed transparent; transition: border-color .15s, background .15s; }
 .dropzone.empty-dz { border-color: var(--ski-line); align-items: center; justify-content: center; color: var(--ski-muted); font-size: 13px; }
 .dropzone.over { border-color: var(--ski-primary); background: color-mix(in srgb, var(--ski-primary) 7%, transparent); }
 .drop-marker { height: 3px; border-radius: 3px; background: var(--ski-primary); margin: -1px 4px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ski-primary) 20%, transparent); }
 .drag-ghost { position: fixed; z-index: 1000; pointer-events: none; opacity: .92; transform: rotate(2deg) scale(1.03); box-shadow: 0 12px 28px rgba(0,0,0,.25); border-radius: 10px; }
 .dragging-src { opacity: .35; }
-.groups-layout { display: grid; grid-template-columns: 300px minmax(0,1fr); gap: 16px; align-items: start; }
+.groups-layout { display: grid; grid-template-columns: 340px minmax(0,1fr); gap: 16px; align-items: start; }
 @media (max-width: 800px) { .groups-layout { grid-template-columns: 1fr; } }
 .groups-layout .pool { position: sticky; top: 0; max-height: calc(100vh - 140px); overflow: auto; }
 .group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }

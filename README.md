@@ -39,14 +39,15 @@ Ideas tomadas de cada uno: la potencia de secuencias de *Irrigation Unlimited*, 
 ## Características
 
 - **Panel lateral** propio, responsive (escritorio, tablet y móvil), modo claro/oscuro según tu tema, en **español e inglés**.
-- **Zonas**: detecta automáticamente switches/válvulas; botón *Agregar todas las zonas Rain Bird*; color, caudal (L/min), habilitar/deshabilitar y prueba de 1 minuto.
-- **Grupos con drag & drop** (mouse y táctil): arrastrá zonas a grupos, reordená dentro del grupo, soltá en la lista para quitar, soltá en "Nuevo grupo" para crear uno. Una zona puede estar en varios grupos.
+- **Flujo simple: Aspersores → Grupos → Programas.** Los aspersores son directamente tus dispositivos de HA (switches, válvulas, Rain Bird…), leídos automáticamente junto con su **área nativa de HA**.
+- **Grupos con drag & drop** (mouse y táctil): arrastrá dispositivos a grupos, reordená, soltá en la lista para quitar o en "Nuevo grupo" para crear uno. Filtros por área / Rain Bird / sin grupo y botón **Crear grupos desde las áreas de HA**. Un aspersor puede estar en varios grupos; con el lápiz editás nombre, color, caudal o lo probás 1 minuto.
 - **Programas**:
   - Calendario: días de la semana, cada N días, días del mes, impares, pares o fechas específicas (con repetición anual), filtrado por **meses activos**.
   - **Múltiples horarios por día**: hora fija, amanecer o atardecer con desfase.
   - **Secuencia** armada arrastrando grupos; cada paso define:
     - **Modo de encendido**: secuencial, 2, 3, 4, todos o cualquier N a la vez (cola rodante: cuando termina un aspersor arranca el siguiente, sin esperar al lote completo).
-    - **Tiempo**: fijo para todos los aspersores del grupo o **personalizado por aspersor** (0 = omitir).
+    - **Tiempo**: igual para todos los aspersores o **uno por uno**.
+    - **Orden de encendido por drag & drop**: definís qué aspersor arranca primero y cuál después, y podés omitir un aspersor solo en ese programa.
   - Ajuste de tiempos (%), pausa entre aspersores y entre grupos, qué hacer si hay otro riego en curso (encolar u omitir), ignorar sensores.
   - **Vista previa** con duración estimada, consumo de agua y **línea de tiempo (Gantt)**.
 - **Panel en vivo**: progreso general, aspersores activos con cuenta regresiva, saltar zona, detener todo, cola de ejecución y riego manual de zonas o grupos.
@@ -68,9 +69,8 @@ Ideas tomadas de cada uno: la potencia de secuencias de *Irrigation Unlimited*, 
 Copiá `custom_components/sk_irrigation` en `config/custom_components/` y reiniciá.
 
 ## Uso rápido
-1. **Zonas** → *Agregar todas las zonas Rain Bird* (o agregá switches/válvulas uno a uno).
-2. **Grupos** → arrastrá las zonas a grupos (ej. *Frente*, *Laterales*, *Fondo*).
-3. **Programas** → *Nuevo programa* → elegí días y horarios → arrastrá grupos a la secuencia → definí cuántos aspersores a la vez y los tiempos → **Guardar**.
+1. **Grupos** → arrastrá tus aspersores (dispositivos de HA) a grupos, o tocá *Crear grupos desde las áreas de HA*.
+2. **Programas** → *Nuevo programa* → días y horarios → arrastrá grupos a la secuencia → en cada grupo elegí cuántos aspersores a la vez, el tiempo (igual o uno por uno) y arrastrá los aspersores para definir el orden → **Guardar**.
 
 ## Entidades y servicios
 

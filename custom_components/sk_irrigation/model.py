@@ -150,6 +150,9 @@ def normalize_step(raw: dict, group_ids: set[str], zone_ids: set[str]) -> dict |
     for zid, minutes in (raw.get("durations") or {}).items():
         if zid in zone_ids:
             durations[zid] = _float(minutes, 0.0, 0, 600)
+    seen: set[str] = set()
+    order = [z for z in raw.get("order") or [] if z in zone_ids and not (z in seen or seen.add(z))]
+    skip = sorted({z for z in raw.get("skip") or [] if z in zone_ids})
     return {
         "id": _str(raw.get("id")) or new_id("step"),
         "group_id": group_id,
@@ -157,7 +160,16 @@ def normalize_step(raw: dict, group_ids: set[str], zone_ids: set[str]) -> dict |
         "duration_mode": DURATION_CUSTOM if raw.get("duration_mode") == DURATION_CUSTOM else DURATION_UNIFORM,
         "duration": _float(raw.get("duration"), 10.0, 0, 600),
         "durations": durations,
+        "order": order,
+        "skip": skip,
     }
+
+
+def step_zone_order(step: dict, group: dict) -> list[str]:
+    """Zones of ``group`` in the order chosen for this step (new zones go last)."""
+    members = group.get("zone_ids", [])
+    ordered = [z for z in step.get("order") or [] if z in members]
+    return ordered + [z for z in members if z not in ordered]
 
 
 def normalize_program(raw: dict, group_ids: set[str], zone_ids: set[str]) -> dict:
@@ -298,8 +310,11 @@ def build_program_plan(program: dict, zones: dict, groups: dict, budget_pct: flo
         if not group:
             continue
         planned = PlannedStep(label=group["name"], concurrency=step.get("concurrency", 1))
-        for zid in group["zone_ids"]:
+        skip = set(step.get("skip") or [])
+        for zid in step_zone_order(step, group):
             zone = zones.get(zid)
+            if zid in skip:
+                continue
             if not zone or not zone.get("enabled", True) or not zone.get("entity_id"):
                 continue
             if step.get("duration_mode") == DURATION_CUSTOM:

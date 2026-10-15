@@ -154,3 +154,22 @@ async def test_websocket_api(hass, hass_ws_client):
         if msg["id"] == 4:
             break
     assert msg["result"]["state"]["status"] == "rain_delay"
+    # layout save creates a sprinkler and its group membership in one write
+    await client.send_json({"id": 5, "type": f"{DOMAIN}/save", "key": "layout", "value": {
+        "zones": engine.config["zones"] + [{"id": "z9", "name": "New", "entity_id": "input_boolean.rain"}],
+        "groups": [{"id": "g9", "name": "Fresh", "zone_ids": ["z9", "z1"]}]}})
+    while True:
+        msg = await client.receive_json()
+        if msg["id"] == 5:
+            break
+    assert msg["result"]["config"]["groups"][0]["zone_ids"] == ["z9", "z1"]
+
+
+async def test_candidates_include_area(hass):
+    from homeassistant.helpers import area_registry as ar, entity_registry as er
+    _, engine = await _setup(hass)
+    area = ar.async_get(hass).async_create("Jardín")
+    er.async_get(hass).async_update_entity(ZONES[0], area_id=area.id)
+    cand = {c["entity_id"]: c for c in engine.candidates()}
+    assert cand[ZONES[0]]["area"] == "Jardín"
+    assert cand[ZONES[1]]["area"] is None

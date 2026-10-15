@@ -47,11 +47,12 @@ const candidates = [];
 for (let i = 1; i <= 8; i++) {
   const id = `switch.rainbird_sprinkler_${i}`;
   states[id] = { entity_id: id, state: "off", attributes: { friendly_name: `Rain Bird Sprinkler ${i}` } };
-  candidates.push({ entity_id: id, name: `Rain Bird Sprinkler ${i}`, domain: "switch", platform: "rainbird" });
+  const area = i <= 2 ? "Jardín frontal" : i <= 4 ? "Laterales" : "Fondo";
+  candidates.push({ entity_id: id, name: `Rain Bird Sprinkler ${i}`, domain: "switch", platform: "rainbird", area });
 }
 for (const [id, name] of [["valve.goteo_huerta", "Goteo huerta"], ["switch.bomba_pozo", "Bomba pozo"]]) {
   states[id] = { entity_id: id, state: "off", attributes: { friendly_name: name } };
-  candidates.push({ entity_id: id, name, domain: id.split(".")[0], platform: "demo" });
+  candidates.push({ entity_id: id, name, domain: id.split(".")[0], platform: "demo", area: id.includes("huerta") ? "Huerta" : null });
 }
 states["binary_sensor.rain"] = { entity_id: "binary_sensor.rain", state: "off", attributes: { friendly_name: "Sensor de lluvia" } };
 states["weather.home"] = { entity_id: "weather.home", state: "sunny", attributes: { friendly_name: "Clima casa" } };
@@ -120,7 +121,8 @@ function push(withConfig) { listeners.forEach((cb) => cb({ state: state(), ...(w
 function planProgram(p) {
   return p.steps.map((s) => {
     const g = config.groups.find((x) => x.id === s.group_id);
-    return { label: g.name, concurrency: s.concurrency, zones: g.zone_ids.map((z) => ({ zone_id: z,
+    const order = (s.order || []).filter((z) => g.zone_ids.includes(z)).concat(g.zone_ids.filter((z) => !(s.order || []).includes(z)));
+    return { label: g.name, concurrency: s.concurrency, zones: order.filter((z) => !(s.skip || []).includes(z)).map((z) => ({ zone_id: z,
       seconds: Math.round((s.duration_mode === "custom" ? (s.durations[z] ?? s.duration) : s.duration) * 60 * p.budget / 100) })).filter((z) => z.seconds > 0) };
   });
 }
@@ -165,12 +167,16 @@ setInterval(() => {
 
 const handlers = {
   "sk_irrigation/data": () => ({ version: "1.0.0-demo", config, state: state(), candidates, is_admin: true }),
-  "sk_irrigation/save": (m) => { config[m.key] = JSON.parse(JSON.stringify(m.value)); push(true); return { config }; },
+  "sk_irrigation/save": (m) => {
+    const v = JSON.parse(JSON.stringify(m.value));
+    if (m.key === "layout") Object.assign(config, v); else config[m.key] = v;
+    push(true); return { config };
+  },
   "sk_irrigation/import": (m) => { Object.assign(config, m.config); push(true); return { config }; },
   "sk_irrigation/action": (m) => {
     let run = null;
     if (m.action === "run_program") { const p = config.programs.find((x) => x.id === m.target); run = enqueue(p.name, "manual", planProgram(p), p.id); }
-    if (m.action === "run_zone") { const z = config.zones.find((x) => x.id === m.target); run = enqueue(z.name, "manual", [{ label: z.name, concurrency: 1, zones: [{ zone_id: z.id, seconds: m.minutes * 60 }] }]); }
+    if (m.action === "run_zone") { const z = config.zones.find((x) => x.id === m.target || x.entity_id === m.target); run = enqueue(z.name, "manual", [{ label: z.name, concurrency: 1, zones: [{ zone_id: z.id, seconds: m.minutes * 60 }] }]); }
     if (m.action === "run_group") { const g = config.groups.find((x) => x.id === m.target); run = enqueue(g.name, "manual", [{ label: g.name, concurrency: m.concurrency ?? 1, zones: g.zone_ids.map((z) => ({ zone_id: z, seconds: m.minutes * 60 })) }]); }
     if (m.action === "stop") { if (current) history.unshift({ id: current.id, name: current.name, source: current.source, status: "stopped", reason: "stopped", start: current.started, end: iso(Date.now()), zones: current.done }); queue.length = 0; current = null; }
     if (m.action === "skip" && current) { current._bars.forEach((b) => { if (b.rs <= Date.now() && b.re > Date.now() && (!m.target || b.zone_id === m.target)) b.re = Date.now(); }); }
