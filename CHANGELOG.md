@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.1 — sin publicar
+## 1.3.1 — 2026-10-15
 - Tarjetas Aspersores y Grupos: opción **Columnas** (vacío = automático) para controlar la disposición.
 - Los nombres largos en las tarjetas ocupan hasta 2 líneas en lugar de cortarse, con el nombre completo al pasar el mouse.
 

@@ -1,8 +1,8 @@
 // SK Irrigation Manager — Home Assistant panel.
 // Dependency-free web component: renders with template strings, uses event
 // delegation, and implements pointer-based drag & drop (mouse + touch).
-import { I18N } from "./sk-irrigation-i18n.js?v=1.3.0";
-import { STYLES } from "./sk-irrigation-styles.js?v=1.3.0";
+import { I18N } from "./sk-irrigation-i18n.js?v=1.3.1";
+import { STYLES } from "./sk-irrigation-styles.js?v=1.3.1";
 
 const DOMAIN = "sk_irrigation";
 const TABS = [
