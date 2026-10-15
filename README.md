@@ -97,8 +97,10 @@ La integración trae 4 tarjetas que **se cargan solas**: no hace falta agregar r
 |---|---|---|
 | `custom:sk-irrigation-status-card` | Riego en curso con cuenta regresiva, aspersores activos, saltar/detener, próximo riego, condiciones, sistema y retraso por lluvia | `title`, `show_controls` |
 | `custom:sk-irrigation-programs-card` | Ciclos con horarios, duración, próximo riego, aviso si no se ejecutaría, activar y regar ahora | `title`, `show_run`, `show_disabled` |
-| `custom:sk-irrigation-groups-card` | Grupos con sus aspersores encendidos en vivo y riego rápido del grupo | `title`, `group`, `minutes`, `concurrency` |
-| `custom:sk-irrigation-zones-card` | Grilla de aspersores con estado, último riego y riego manual | `title`, `group`, `minutes` |
+| `custom:sk-irrigation-groups-card` | Grupos con sus aspersores encendidos en vivo y riego rápido del grupo | `title`, `group`, `columns`, `minutes`, `concurrency` |
+| `custom:sk-irrigation-zones-card` | Grilla de aspersores con estado, último riego y riego manual | `title`, `group`, `columns`, `minutes` |
+
+`columns` fija la cantidad de columnas (por ejemplo `8` para una tarjeta a todo el ancho). Si se deja vacío, se ajusta solo.
 
 ```yaml
 type: custom:sk-irrigation-groups-card
@@ -106,6 +108,7 @@ title: Riego del frente
 group: Jardín frontal   # nombre o id; vacío = todos
 minutes: [5, 10, 15]
 concurrency: 2
+columns: 3
 ```
 
 ## 🚀 Instalación

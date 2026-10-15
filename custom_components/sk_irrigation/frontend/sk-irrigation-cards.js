@@ -46,10 +46,10 @@ const fmtDur = (sec) => {
 const LABELS = {
   es: { title: "Título", show_controls: "Mostrar controles (sistema y retraso por lluvia)", show_run: "Botón regar ahora",
     show_disabled: "Mostrar ciclos desactivados", group: "Grupo (nombre o id, vacío = todos)", concurrency: "Aspersores a la vez (0 = todos)",
-    minutes: "Minutos del riego manual" },
+    minutes: "Minutos del riego manual", columns: "Columnas (vacío = automático)" },
   en: { title: "Title", show_controls: "Show controls (system and rain delay)", show_run: "Run now button",
     show_disabled: "Show disabled cycles", group: "Group (name or id, empty = all)", concurrency: "Sprinklers at once (0 = all)",
-    minutes: "Manual run minutes" },
+    minutes: "Manual run minutes", columns: "Columns (empty = auto)" },
 };
 const computeLabel = (s) => {
   const lang = (document.querySelector("home-assistant")?.hass?.language || navigator.language || "en").startsWith("es") ? "es" : "en";
@@ -149,8 +149,9 @@ const CSS = `
   .switch span::after { content: ""; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; border-radius: 50%; background: #fff; transition: .2s; }
   .switch input:checked + span { background: #2e9e6b; }
   .switch input:checked + span::after { transform: translateX(16px); }
-  .grp { border: 1px solid var(--divider-color, rgba(0,0,0,.1)); border-left: 4px solid var(--c); border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
-  .grp:first-of-type { margin-top: 0; }
+  .grps { display: grid; gap: 10px; align-items: start; }
+  .grp { border: 1px solid var(--divider-color, rgba(0,0,0,.1)); border-left: 4px solid var(--c); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+  .clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; line-height: 1.25; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .zc { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 3px 9px; border-radius: 99px; border: 1px solid var(--divider-color, rgba(0,0,0,.1)); }
   .zc.on { background: #1e88e5; border-color: #1e88e5; color: #fff; }
@@ -159,7 +160,8 @@ const CSS = `
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
   .tile { border: 1px solid var(--divider-color, rgba(0,0,0,.1)); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 6px; border-left: 4px solid var(--c); }
   .tile.on { background: color-mix(in srgb, #1e88e5 10%, transparent); }
-  .tile .nm { font-weight: 600; font-size: 13.5px; }
+  .tile { min-width: 0; }
+  .tile .nm { font-weight: 600; font-size: 13.5px; min-height: 2.5em; }
   .on-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(127,127,127,.4); }
   .on-dot.on { background: #1e88e5; box-shadow: 0 0 0 3px color-mix(in srgb, #1e88e5 25%, transparent); }
   .empty { color: var(--secondary-text-color); text-align: center; padding: 12px 0; font-size: 13.5px; }
@@ -246,6 +248,10 @@ class SkBaseCard extends HTMLElement {
   }
   _click() {}
   _change() {}
+  _cols(fallbackMin) {
+    const n = Math.round(Number(this._config.columns) || 0);
+    return n > 0 ? `grid-template-columns:repeat(${Math.min(n, 12)},minmax(0,1fr))` : `grid-template-columns:repeat(auto-fill,minmax(${fallbackMin}px,1fr))`;
+  }
   header(icon, title, extra = "") {
     return `<div class="hd"><ha-icon icon="${icon}"></ha-icon><span class="t">${esc(title)}</span>${extra}</div>`;
   }
@@ -359,6 +365,7 @@ class SkGroupsCard extends SkBaseCard {
     return { computeLabel, schema: [
       { name: "title", selector: { text: {} } },
       { name: "group", selector: { text: {} } },
+      { name: "columns", selector: { number: { min: 1, max: 6, mode: "box" } } },
       { name: "concurrency", selector: { number: { min: 0, max: 8, mode: "box" } } },
     ] };
   }
@@ -370,16 +377,17 @@ class SkGroupsCard extends SkBaseCard {
       groups = groups.filter((g) => g.id === this._config.group || g.name.toLowerCase() === ref);
     }
     const mins = this._config.minutes || [5, 10, 15];
-    return this.header("mdi:vector-arrange-below", this._config.title || this.t("groups")) + (groups.length ? groups.map((g) => {
+    const cols = Number(this._config.columns) > 1;
+    return this.header("mdi:vector-arrange-below", this._config.title || this.t("groups")) + (groups.length ? `<div class="grps" style="${cols ? this._cols(240) : "grid-template-columns:1fr"}">` + groups.map((g) => {
       const zones = g.zone_ids.map((z) => store.zone(z)).filter(Boolean);
       const open = this._open === g.id;
       return `<div class="grp" style="--c:${esc(g.color)}">
-        <div class="row"><b class="grow ellipsis">${esc(g.name)}</b><span class="small muted">${zones.length} ${this.t("sprinklers")}</span>
+        <div class="row"><b class="grow clamp2" title="${esc(g.name)}">${esc(g.name)}</b><span class="small muted">${zones.length} ${this.t("sprinklers")}</span>
           <button class="i" title="${this.t("run")}" data-a="toggle" data-id="${g.id}"><ha-icon icon="${open ? "mdi:close" : "mdi:play-circle-outline"}"></ha-icon></button></div>
         <div class="chips">${zones.map((z) => `<span class="zc ${this._isOn(z.entity_id) ? "on" : ""}" data-entity="${esc(z.entity_id || "")}"><span class="dot" style="background:${esc(z.color)}"></span>${esc(z.name)}</span>`).join("")}</div>
         ${open ? `<div class="mins"><span class="small muted">${this.t("run")}:</span>${mins.map((m) => `<button class="b" data-a="rungroup" data-id="${g.id}" data-m="${m}">${m} ${this.t("min_each")}</button>`).join("")}</div>` : ""}
       </div>`;
-    }).join("") : `<div class="empty">—</div>`);
+    }).join("") + "</div>" : `<div class="empty">—</div>`);
   }
   _click(e) {
     const el = e.target.closest("[data-a]");
@@ -402,6 +410,7 @@ class SkZonesCard extends SkBaseCard {
     return { computeLabel, schema: [
       { name: "title", selector: { text: {} } },
       { name: "group", selector: { text: {} } },
+      { name: "columns", selector: { number: { min: 1, max: 12, mode: "box" } } },
       { name: "minutes", selector: { number: { min: 1, max: 120, mode: "box", unit_of_measurement: "min" } } },
     ] };
   }
@@ -415,10 +424,10 @@ class SkZonesCard extends SkBaseCard {
     }
     const stats = store.state.zone_stats || {};
     const mins = Number(this._config.minutes) || 5;
-    return this.header("mdi:sprinkler", this._config.title || this.t("zones")) + (zones.length ? `<div class="tiles">${zones.map((z) => {
+    return this.header("mdi:sprinkler", this._config.title || this.t("zones")) + (zones.length ? `<div class="tiles" style="${this._cols(130)}">${zones.map((z) => {
       const s = stats[z.id];
       return `<div class="tile ${this._isOn(z.entity_id) ? "on" : ""}" style="--c:${esc(z.color)}" data-entity="${esc(z.entity_id || "")}">
-        <div class="row"><span class="nm grow ellipsis">${esc(z.name)}</span><span class="on-dot ${this._isOn(z.entity_id) ? "on" : ""}" data-entity="${esc(z.entity_id || "")}"></span></div>
+        <div class="row" style="align-items:flex-start"><span class="nm grow clamp2" title="${esc(z.name)}">${esc(z.name)}</span><span class="on-dot ${this._isOn(z.entity_id) ? "on" : ""}" data-entity="${esc(z.entity_id || "")}"></span></div>
         <div class="small muted ellipsis">${this.t("last")}: ${s?.last ? this._when(s.last) : this.t("never")}</div>
         <button class="b" data-a="run" data-id="${z.id}" ${z.enabled && z.entity_id ? "" : "disabled"}><ha-icon icon="mdi:play"></ha-icon>${mins} ${this.t("minutes")}</button></div>`;
     }).join("")}</div>` : `<div class="empty">—</div>`);
