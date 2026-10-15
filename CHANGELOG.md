@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.2 — 2026-10-15
+- README compatible con el visor de HACS: imágenes con URL absoluta y diagrama de flujo como imagen
+  (HACS no resuelve rutas relativas ni dibuja Mermaid). Sin cambios funcionales.
+
 ## 1.2.1 — 2026-10-15
 - **Selector de entidades propio** que reemplaza los desplegables nativos: buscador por nombre, área,
   controlador o entity_id; agrupado por área de HA; navegación con teclado; selección múltiple

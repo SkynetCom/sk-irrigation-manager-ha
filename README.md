@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/banner.png" alt="SK Irrigation Manager for Home Assistant" width="100%">
+  <img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/banner.png" alt="SK Irrigation Manager for Home Assistant" width="100%">
 </p>
 
 <p align="center">
@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/Home%20Assistant-2024.11%2B-18bcf2?logo=homeassistant&logoColor=white" alt="Home Assistant">
   <a href="https://github.com/SkynetCom/sk-irrigation-manager-ha/actions/workflows/validate.yml"><img src="https://github.com/SkynetCom/sk-irrigation-manager-ha/actions/workflows/validate.yml/badge.svg" alt="Validate"></a>
   <img src="https://img.shields.io/badge/idiomas-ES%20%7C%20EN-2e9e6b" alt="Idiomas">
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/SkynetCom/sk-irrigation-manager-ha?color=8e44ad" alt="Licencia"></a>
+  <a href="https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/LICENSE"><img src="https://img.shields.io/github/license/SkynetCom/sk-irrigation-manager-ha?color=8e44ad" alt="Licencia"></a>
 </p>
 
 <p align="center">
@@ -71,26 +71,20 @@ Válvula maestra o bomba, límite hidráulico de aspersores simultáneos, tiempo
 
 ## 🧭 Cómo funciona
 
-```mermaid
-flowchart LR
-    A["🔌 Aspersores<br/><sub>tus dispositivos de HA<br/>(Rain Bird, switch, valve…)</sub>"] -->|drag & drop| B["🗂️ Grupos<br/><sub>Frente · Laterales · Fondo<br/>o por área de HA</sub>"]
-    B -->|drag & drop| C["🗓️ Programas<br/><sub>días · horarios · orden<br/>tiempos · condiciones</sub>"]
-    C --> D{"✅ ¿Condiciones OK?"}
-    D -->|sí| E["💧 Riego<br/><sub>secuencial o N a la vez</sub>"]
-    D -->|no| F["⏭️ Omitido<br/><sub>queda en el historial</sub>"]
-```
+<p align="center"><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/flow.png" alt="Aspersores → Grupos → Programas → Condiciones → Riego" width="100%"></p>
 
 ## 📸 Capturas
 
-<p align="center"><img src="docs/dashboard.png" alt="Panel en vivo" width="100%"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/dashboard.png" alt="Panel en vivo" width="100%"></p>
 
-| Grupos con drag &amp; drop | Editor de programas con vista previa |
-|---|---|
-| <img src="docs/groups.png" alt="Grupos"> | <img src="docs/program-editor.png" alt="Editor de programas"> |
-| **Condiciones personalizadas** | **Programas (tema oscuro)** |
-| <img src="docs/conditions.png" alt="Condiciones"> | <img src="docs/programs.png" alt="Programas"> |
+<table>
+<tr><th width="50%">Grupos con drag &amp; drop</th><th width="50%">Editor de programas con vista previa</th></tr>
+<tr><td><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/groups.png" alt="Grupos"></td><td><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/program-editor.png" alt="Editor de programas"></td></tr>
+<tr><th>Condiciones personalizadas</th><th>Programas (tema oscuro)</th></tr>
+<tr><td><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/conditions.png" alt="Condiciones"></td><td><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/programs.png" alt="Programas"></td></tr>
+</table>
 
-> 💡 ¿Querés probar la interfaz sin instalar nada? Abrí [`dev/demo.html`](dev/demo.html) con un servidor local (ver [Desarrollo](#-desarrollo)).
+> 💡 ¿Querés probar la interfaz sin instalar nada? Abrí [`dev/demo.html`](https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/dev/demo.html) con un servidor local (ver [Desarrollo](#-desarrollo)).
 
 ## 🚀 Instalación
 
@@ -236,10 +230,10 @@ pytest tests
 
 Estructura: `custom_components/sk_irrigation/` (motor, scheduler, API websocket, entidades), `frontend/` (panel web sin dependencias), `brand/` (íconos para HA 2026.3+), `tests/`, `dev/demo.html`.
 
-Historial de versiones en [CHANGELOG.md](CHANGELOG.md).
+Historial de versiones en [CHANGELOG.md](https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/CHANGELOG.md).
 
 ## 📄 Licencia
-[MIT](LICENSE) © SK / SkynetCom
+[MIT](https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/LICENSE) © SK / SkynetCom
 
 ---
 
