@@ -1,0 +1,60 @@
+run_program:
+  fields:
+    program:
+      required: true
+      example: "Riego mañana"
+      selector:
+        text:
+run_group:
+  fields:
+    group:
+      required: true
+      example: "Jardín frontal"
+      selector:
+        text:
+    duration:
+      default: 10
+      selector:
+        number:
+          min: 0.5
+          max: 720
+          step: 0.5
+          unit_of_measurement: min
+    concurrency:
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 16
+          mode: box
+run_zone:
+  fields:
+    zone:
+      required: true
+      example: "switch.rainbird_zone_1"
+      selector:
+        text:
+    duration:
+      default: 5
+      selector:
+        number:
+          min: 0.5
+          max: 720
+          step: 0.5
+          unit_of_measurement: min
+stop_all:
+skip:
+  fields:
+    zone:
+      selector:
+        text:
+set_rain_delay:
+  fields:
+    hours:
+      required: true
+      default: 24
+      selector:
+        number:
+          min: 0
+          max: 720
+          unit_of_measurement: h

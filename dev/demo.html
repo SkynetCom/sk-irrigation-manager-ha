@@ -1,0 +1,210 @@
+<!doctype html>
+<!--
+  Standalone UI demo for the SK Irrigation panel (no Home Assistant needed).
+  Serve the repository root and open /dev/demo.html:
+    python3 -m http.server 8765
+  A tiny in-memory mock of the websocket API simulates runs in accelerated time.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SK Irrigation — Demo</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+<style>
+  html, body { margin: 0; height: 100%; background: #f4f6f8; }
+  body.dark { --primary-background-color: #111418; --card-background-color: #1c2026; --primary-text-color: #e6e9ec;
+    --secondary-text-color: #9aa4ae; --divider-color: rgba(255,255,255,.1); --app-header-background-color: #1c2026; }
+  #ctl { position: fixed; right: 10px; bottom: 10px; z-index: 9999; font: 12px system-ui; display: flex; gap: 6px; }
+  #ctl button { padding: 6px 10px; border-radius: 8px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+</style>
+<script>
+  // Minimal stand-ins for HA frontend elements used by the panel.
+  customElements.define("ha-icon", class extends HTMLElement {
+    static get observedAttributes() { return ["icon"]; }
+    connectedCallback() { this._r(); }
+    attributeChangedCallback() { this._r(); }
+    _r() {
+      if (!this.shadowRoot) this.attachShadow({ mode: "open" });
+      const name = (this.getAttribute("icon") || "").replace("mdi:", "");
+      this.shadowRoot.innerHTML = `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+        <style>:host{display:inline-flex;vertical-align:middle;line-height:1}i{font-size:var(--mdc-icon-size,24px);line-height:1}</style><i class="mdi mdi-${name}"></i>`;
+    }
+  });
+  customElements.define("ha-menu-button", class extends HTMLElement {});
+</script>
+</head>
+<body>
+<div id="ctl"><button onclick="document.body.classList.toggle('dark')">🌓</button><button onclick="setLang()">ES/EN</button></div>
+<script type="module">
+import "../custom_components/sk_irrigation/frontend/sk-irrigation-panel.js";
+
+const SPEED = 30; // demo time runs 30x faster
+const pad = (n) => String(n).padStart(2, "0");
+const iso = (ms) => new Date(ms).toISOString();
+const states = {};
+const candidates = [];
+for (let i = 1; i <= 8; i++) {
+  const id = `switch.rainbird_sprinkler_${i}`;
+  states[id] = { entity_id: id, state: "off", attributes: { friendly_name: `Rain Bird Sprinkler ${i}` } };
+  candidates.push({ entity_id: id, name: `Rain Bird Sprinkler ${i}`, domain: "switch", platform: "rainbird" });
+}
+for (const [id, name] of [["valve.goteo_huerta", "Goteo huerta"], ["switch.bomba_pozo", "Bomba pozo"]]) {
+  states[id] = { entity_id: id, state: "off", attributes: { friendly_name: name } };
+  candidates.push({ entity_id: id, name, domain: id.split(".")[0], platform: "demo" });
+}
+states["binary_sensor.rain"] = { entity_id: "binary_sensor.rain", state: "off", attributes: { friendly_name: "Sensor de lluvia" } };
+states["weather.home"] = { entity_id: "weather.home", state: "sunny", attributes: { friendly_name: "Clima casa" } };
+states["sensor.temp_ext"] = { entity_id: "sensor.temp_ext", state: "14", attributes: { friendly_name: "Temperatura exterior" } };
+
+const C = ["#2e9e6b", "#1e88e5", "#f2a900", "#e5533d", "#8e44ad", "#00a6a6"];
+const config = {
+  zones: [
+    ["Césped frente", 1], ["Cantero entrada", 2], ["Lateral izquierdo", 3], ["Lateral derecho", 4],
+    ["Fondo césped", 5], ["Fondo canteros", 6], ["Pileta", 7],
+  ].map(([name, i], k) => ({ id: `zone_${i}`, name, entity_id: `switch.rainbird_sprinkler_${i}`, icon: "mdi:sprinkler",
+    color: C[k % C.length], enabled: true, flow_rate: 12 + k * 2, notes: "" })),
+  groups: [
+    { id: "group_front", name: "Jardín frontal", color: "#2e9e6b", icon: "mdi:sprinkler-variant", zone_ids: ["zone_1", "zone_2"] },
+    { id: "group_sides", name: "Laterales", color: "#1e88e5", icon: "mdi:sprinkler-variant", zone_ids: ["zone_3", "zone_4"] },
+    { id: "group_back", name: "Fondo", color: "#f2a900", icon: "mdi:sprinkler-variant", zone_ids: ["zone_5", "zone_6", "zone_7"] },
+  ],
+  programs: [
+    { id: "prog_morning", name: "Riego mañana", color: "#2e9e6b", enabled: true,
+      schedule: { mode: "weekdays", weekdays: [0, 2, 4], interval_days: 2, anchor_date: "2026-10-01", month_days: [], dates: [], months: [] },
+      start_times: [{ type: "fixed", time: "06:00" }, { type: "sunset", offset: 30 }],
+      steps: [
+        { id: "s1", group_id: "group_front", concurrency: 1, duration_mode: "uniform", duration: 12, durations: {} },
+        { id: "s2", group_id: "group_sides", concurrency: 2, duration_mode: "uniform", duration: 8, durations: {} },
+        { id: "s3", group_id: "group_back", concurrency: 2, duration_mode: "custom", duration: 10, durations: { zone_5: 15, zone_6: 6, zone_7: 10 } },
+      ],
+      budget: 100, zone_delay_s: -1, step_delay_s: -1, ignore_conditions: false, on_busy: "queue" },
+    { id: "prog_summer", name: "Refuerzo verano", color: "#e5533d", enabled: false,
+      schedule: { mode: "interval", weekdays: [], interval_days: 3, anchor_date: "2026-10-01", month_days: [], dates: [], months: [12, 1, 2] },
+      start_times: [{ type: "fixed", time: "21:30" }],
+      steps: [{ id: "s4", group_id: "group_back", concurrency: 0, duration_mode: "uniform", duration: 5, durations: {} }],
+      budget: 120, zone_delay_s: -1, step_delay_s: -1, ignore_conditions: false, on_busy: "skip" },
+  ],
+  settings: { enabled: true, rain_delay_until: null, rain_sensors: ["binary_sensor.rain"], weather_entity: "weather.home",
+    weather_conditions: ["rainy", "pouring", "lightning-rainy", "snowy", "snowy-rainy", "hail"], freeze_sensor: "sensor.temp_ext",
+    freeze_threshold: 3, budget_entity: null, global_budget: 100, master_entity: "switch.bomba_pozo", master_lead_s: 3,
+    master_lag_s: 3, max_concurrent: 0, zone_delay_s: 5, step_delay_s: 10, max_zone_minutes: 120, history_size: 60, notify_service: null },
+};
+let current = null;
+const queue = [];
+const history = [
+  { id: "h1", name: "Riego mañana", program_id: "prog_morning", source: "schedule", status: "completed", reason: "",
+    start: iso(Date.now() - 86400000), end: iso(Date.now() - 86400000 + 2700000),
+    zones: config.zones.slice(0, 5).map((z) => ({ zone_id: z.id, seconds: 600 })) },
+  { id: "h2", name: "Riego mañana", program_id: "prog_morning", source: "schedule", status: "skipped", reason: "rain_sensor:binary_sensor.rain",
+    start: iso(Date.now() - 3 * 86400000), end: iso(Date.now() - 3 * 86400000), zones: [] },
+];
+const zoneStats = { zone_1: { last: iso(Date.now() - 86400000), last_seconds: 720 } };
+const listeners = new Set();
+
+function nextRun(p) {
+  if (!p.enabled) return null;
+  const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(6, 0, 0, 0);
+  return iso(d);
+}
+function state() {
+  const next_runs = Object.fromEntries(config.programs.map((p) => [p.id, nextRun(p)]));
+  const np = config.programs.find((p) => p.enabled);
+  return { now: iso(Date.now()), status: current ? "running" : config.settings.enabled ? "idle" : "disabled",
+    current, queue: queue.map((r) => ({ id: r.id, name: r.name, source: r.source, zones: r.zones })),
+    blocking: config.settings.enabled ? [] : ["system_disabled"], budget: config.settings.global_budget, next_runs,
+    next: np ? { program_id: np.id, name: np.name, at: next_runs[np.id] } : null, zone_stats: zoneStats, history };
+}
+function push(withConfig) { listeners.forEach((cb) => cb({ state: state(), ...(withConfig ? { config } : {}) })); }
+
+function planProgram(p) {
+  return p.steps.map((s) => {
+    const g = config.groups.find((x) => x.id === s.group_id);
+    return { label: g.name, concurrency: s.concurrency, zones: g.zone_ids.map((z) => ({ zone_id: z,
+      seconds: Math.round((s.duration_mode === "custom" ? (s.durations[z] ?? s.duration) : s.duration) * 60 * p.budget / 100) })).filter((z) => z.seconds > 0) };
+  });
+}
+function enqueue(name, source, steps, program_id = null) {
+  const run = { id: "run_" + Math.random().toString(16).slice(2, 8), name, source, program_id, steps, zones: steps.reduce((a, s) => a + s.zones.length, 0) };
+  queue.push(run); if (!current) startNext(); push(); return run;
+}
+function startNext() {
+  const run = queue.shift(); if (!run) { current = null; return; }
+  const t0 = Date.now(); const bars = []; let t = 0;
+  run.steps.forEach((s, si) => {
+    const lim = s.concurrency <= 0 ? s.zones.length : Math.min(s.concurrency, s.zones.length);
+    const slots = new Array(lim).fill(t); let end = t;
+    s.zones.forEach((z) => { const i = slots.indexOf(Math.min(...slots)); const st = slots[i]; bars.push({ ...z, si, start: st, end: st + z.seconds }); end = Math.max(end, st + z.seconds); slots[i] = st + z.seconds + 5; });
+    t = end + 10;
+  });
+  const real = (sec) => t0 + (sec * 1000) / SPEED;
+  current = { ...run, started: iso(t0), planned_end: iso(real(t)), step_index: 0, active: [], pending: [], done: [],
+    steps: run.steps.map((s) => ({ label: s.label, concurrency: s.concurrency, zones: s.zones })) };
+  current._bars = bars.map((b) => ({ ...b, rs: real(b.start), re: real(b.end) }));
+  current._end = real(t);
+}
+setInterval(() => {
+  if (!current) return;
+  const now = Date.now(); let changed = false;
+  const active = current._bars.filter((b) => b.rs <= now && b.re > now);
+  const ids = active.map((b) => b.zone_id).join();
+  if (ids !== current.active.map((a) => a.zone_id).join()) changed = true;
+  current.active = active.map((b) => ({ zone_id: b.zone_id, entity_id: config.zones.find((z) => z.id === b.zone_id)?.entity_id, started: iso(b.rs), ends: iso(b.re), seconds: b.seconds }));
+  current.done = current._bars.filter((b) => b.re <= now).map((b) => ({ zone_id: b.zone_id, seconds: b.seconds }));
+  current.step_index = Math.max(0, ...current._bars.filter((b) => b.rs <= now).map((b) => b.si));
+  Object.values(states).forEach((s) => { if (s.entity_id.startsWith("switch.rainbird")) s.state = "off"; });
+  current.active.forEach((a) => { if (states[a.entity_id]) states[a.entity_id].state = "on"; });
+  if (now >= current._end) {
+    history.unshift({ id: current.id, name: current.name, program_id: current.program_id, source: current.source, status: "completed",
+      reason: "", start: current.started, end: iso(now), zones: current.done });
+    current.done.forEach((d) => { zoneStats[d.zone_id] = { last: iso(now), last_seconds: d.seconds }; });
+    startNext(); changed = true;
+  }
+  if (changed) { panel.hass = { ...hass, states: { ...states } }; push(); }
+}, 500);
+
+const handlers = {
+  "sk_irrigation/data": () => ({ version: "1.0.0-demo", config, state: state(), candidates, is_admin: true }),
+  "sk_irrigation/save": (m) => { config[m.key] = JSON.parse(JSON.stringify(m.value)); push(true); return { config }; },
+  "sk_irrigation/import": (m) => { Object.assign(config, m.config); push(true); return { config }; },
+  "sk_irrigation/action": (m) => {
+    let run = null;
+    if (m.action === "run_program") { const p = config.programs.find((x) => x.id === m.target); run = enqueue(p.name, "manual", planProgram(p), p.id); }
+    if (m.action === "run_zone") { const z = config.zones.find((x) => x.id === m.target); run = enqueue(z.name, "manual", [{ label: z.name, concurrency: 1, zones: [{ zone_id: z.id, seconds: m.minutes * 60 }] }]); }
+    if (m.action === "run_group") { const g = config.groups.find((x) => x.id === m.target); run = enqueue(g.name, "manual", [{ label: g.name, concurrency: m.concurrency ?? 1, zones: g.zone_ids.map((z) => ({ zone_id: z, seconds: m.minutes * 60 })) }]); }
+    if (m.action === "stop") { if (current) history.unshift({ id: current.id, name: current.name, source: current.source, status: "stopped", reason: "stopped", start: current.started, end: iso(Date.now()), zones: current.done }); queue.length = 0; current = null; }
+    if (m.action === "skip" && current) { current._bars.forEach((b) => { if (b.rs <= Date.now() && b.re > Date.now() && (!m.target || b.zone_id === m.target)) b.re = Date.now(); }); }
+    if (m.action === "rain_delay") config.settings.rain_delay_until = m.hours ? iso(Date.now() + m.hours * 3600000) : null;
+    if (m.action === "remove_queued") { const i = queue.findIndex((r) => r.id === m.target); if (i >= 0) queue.splice(i, 1); }
+    if (m.action === "set_enabled") config.settings.enabled = m.enabled;
+    if (m.action === "set_program_enabled") config.programs.find((p) => p.id === m.target).enabled = m.enabled;
+    push(true);
+    return { run: run && { id: run.id, name: run.name }, state: state() };
+  },
+};
+const hass = {
+  language: new URLSearchParams(location.search).get("lang") || "es",
+  states, services: { notify: { mobile_app_iphone: {}, telegram: {} } },
+  callWS: async (msg) => { await new Promise((r) => setTimeout(r, 60)); return JSON.parse(JSON.stringify(handlers[msg.type](msg))); },
+  connection: { subscribeMessage: async (cb) => { listeners.add(cb); return () => listeners.delete(cb); } },
+};
+window.setLang = () => { const u = new URL(location); u.searchParams.set("lang", hass.language === "es" ? "en" : "es"); location = u; };
+const panel = document.createElement("sk-irrigation-panel");
+panel.hass = hass;
+panel.narrow = false;
+document.body.appendChild(panel);
+window.panel = panel;
+
+// Deep links for screenshots: ?tab=programs&edit=0&run=1&dark=1
+const qs = new URLSearchParams(location.search);
+if (qs.get("dark")) document.body.classList.add("dark");
+if (qs.get("tab")) document.getElementById("ctl").style.display = "none";
+setTimeout(async () => {
+  if (qs.get("run")) await panel._action("run_program", { target: "prog_morning" });
+  if (qs.get("tab")) panel._tab = qs.get("tab");
+  if (qs.get("edit") !== null) panel._edit = JSON.parse(JSON.stringify(panel._config.programs[Number(qs.get("edit"))]));
+  panel._render();
+}, 400);
+</script>
+</body>
+</html>

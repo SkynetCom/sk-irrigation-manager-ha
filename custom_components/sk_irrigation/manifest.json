@@ -1,0 +1,15 @@
+{
+  "domain": "sk_irrigation",
+  "name": "SK Irrigation Manager",
+  "after_dependencies": ["rainbird", "sun"],
+  "codeowners": ["@SkynetCom"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http", "panel_custom", "websocket_api"],
+  "documentation": "https://github.com/SkynetCom/sk-irrigation-manager-ha",
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/SkynetCom/sk-irrigation-manager-ha/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "1.0.0"
+}

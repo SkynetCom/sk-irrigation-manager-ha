@@ -1,0 +1,6 @@
+{
+  "name": "SK Irrigation Manager",
+  "homeassistant": "2024.11.0",
+  "render_readme": true,
+  "country": ["AR", "ES", "US"]
+}

@@ -1,0 +1,125 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "SK Irrigation Manager",
+        "description": "Agrega un panel lateral para gestionar zonas, grupos y programas de riego.",
+        "data": {
+          "sidebar_title": "Título en la barra lateral",
+          "require_admin": "Solo administradores pueden abrir el panel"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Ya está configurado",
+      "single_instance_allowed": "Solo se permite una instancia"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "SK Irrigation Manager",
+        "data": {
+          "sidebar_title": "Título en la barra lateral",
+          "require_admin": "Solo administradores pueden abrir el panel"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Estado",
+        "state": {
+          "idle": "En espera",
+          "running": "Regando",
+          "paused": "Pausado por condiciones",
+          "rain_delay": "Retraso por lluvia",
+          "disabled": "Desactivado"
+        }
+      },
+      "next_run": {
+        "name": "Próximo riego"
+      },
+      "remaining": {
+        "name": "Tiempo restante"
+      },
+      "active_zones": {
+        "name": "Zonas activas"
+      }
+    },
+    "switch": {
+      "system": {
+        "name": "Sistema de riego"
+      }
+    }
+  },
+  "services": {
+    "run_program": {
+      "name": "Ejecutar programa",
+      "description": "Encola un programa de riego ahora.",
+      "fields": {
+        "program": {
+          "name": "Programa",
+          "description": "Nombre o id del programa."
+        }
+      }
+    },
+    "run_group": {
+      "name": "Regar grupo",
+      "description": "Riega todas las zonas de un grupo.",
+      "fields": {
+        "group": {
+          "name": "Grupo",
+          "description": "Nombre o id del grupo."
+        },
+        "duration": {
+          "name": "Minutos por zona",
+          "description": "Tiempo de riego por zona."
+        },
+        "concurrency": {
+          "name": "Zonas simultáneas",
+          "description": "Cuántas zonas a la vez (0 = todas)."
+        }
+      }
+    },
+    "run_zone": {
+      "name": "Regar zona",
+      "description": "Riega una sola zona.",
+      "fields": {
+        "zone": {
+          "name": "Zona",
+          "description": "Nombre, id o entity_id de la zona."
+        },
+        "duration": {
+          "name": "Minutos",
+          "description": "Tiempo de riego."
+        }
+      }
+    },
+    "stop_all": {
+      "name": "Detener todo",
+      "description": "Detiene el riego actual y vacía la cola."
+    },
+    "skip": {
+      "name": "Saltar",
+      "description": "Finaliza la(s) zona(s) activa(s) y pasa a la siguiente.",
+      "fields": {
+        "zone": {
+          "name": "Zona",
+          "description": "Saltar solo este id de zona."
+        }
+      }
+    },
+    "set_rain_delay": {
+      "name": "Retraso por lluvia",
+      "description": "Suspende los programas por algunas horas (0 lo quita).",
+      "fields": {
+        "hours": {
+          "name": "Horas",
+          "description": "Duración del retraso."
+        }
+      }
+    }
+  }
+}

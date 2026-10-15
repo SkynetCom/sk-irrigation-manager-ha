@@ -1,0 +1,10 @@
+{
+  "services": {
+    "run_program": {"service": "mdi:play-circle"},
+    "run_group": {"service": "mdi:sprinkler-variant"},
+    "run_zone": {"service": "mdi:sprinkler"},
+    "stop_all": {"service": "mdi:stop-circle"},
+    "skip": {"service": "mdi:skip-next"},
+    "set_rain_delay": {"service": "mdi:weather-pouring"}
+  }
+}
