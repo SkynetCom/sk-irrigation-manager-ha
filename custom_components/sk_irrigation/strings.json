@@ -46,6 +46,9 @@
       },
       "active_zones": {
         "name": "Active zones"
+      },
+      "current_zone": {
+        "name": "Current sprinkler"
       }
     },
     "switch": {

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 DOMAIN = "sk_irrigation"
 NAME = "SK Irrigation Manager"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 STORAGE_KEY = f"{DOMAIN}.data"
 STORAGE_VERSION = 1
@@ -77,4 +77,13 @@ DEFAULT_SETTINGS = {
     "max_zone_minutes": 120,
     "history_size": 60,
     "notify_service": None,
+    "conditions": [],
+    "manual_conditions": True,
 }
+
+# Custom conditions
+COND_STATE = "state"
+COND_NUMERIC = "numeric"
+COND_TEMPLATE = "template"
+COND_TYPES = (COND_STATE, COND_NUMERIC, COND_TEMPLATE)
+UNAVAILABLE_STATES = ("unavailable", "unknown", "none", "")

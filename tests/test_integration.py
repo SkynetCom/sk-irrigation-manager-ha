@@ -9,6 +9,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 
+from conftest import model
+
 DOMAIN = "sk_irrigation"
 ZONES = [f"input_boolean.zone_{i}" for i in range(1, 5)]
 
@@ -22,6 +24,8 @@ async def _setup(hass: HomeAssistant):
     assert await async_setup_component(hass, "input_boolean", {
         "input_boolean": {**{z.split(".")[1]: {} for z in ZONES}, "rain": {}, "pump": {}},
     })
+    hass.states.async_set("sensor.soc", "80")
+    hass.states.async_set("sensor.precip", "no_rain")
     entry = MockConfigEntry(domain=DOMAIN, data={"sidebar_title": "Riego"}, unique_id=DOMAIN)
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -173,3 +177,60 @@ async def test_candidates_include_area(hass):
     cand = {c["entity_id"]: c for c in engine.candidates()}
     assert cand[ZONES[0]]["area"] == "Jardín"
     assert cand[ZONES[1]]["area"] is None
+
+
+SOC_RECHECK = {"type": "numeric", "entity_id": "sensor.soc", "above": 20, "recheck": True, "label": "Battery"}
+
+
+async def test_conditions_block_and_recheck_stops_run(hass):
+    _, engine = await _setup(hass)
+    await _configure(engine, concurrency=1, minutes=0.05)
+    program = dict(engine.find_program("p1"), conditions=[
+        {"type": "state", "entity_id": "sensor.precip", "states": ["no_rain"]}])
+    await engine.async_save("programs", [program])
+    await engine.async_save("settings", {**engine.settings, "conditions": [SOC_RECHECK]})
+    # Global + program conditions block the scheduled trigger
+    hass.states.async_set("sensor.precip", "rain")
+    await engine._trigger_scheduled(engine.find_program("p1"))
+    assert engine.current is None and engine.store.history[0]["status"] == "skipped"
+    assert "sensor.precip" in engine.store.history[0]["reason"]
+    assert engine.state_dict()["program_blocks"]["p1"]
+    # ...and manual runs too (manual_conditions defaults to on)
+    from custom_components.sk_irrigation.engine import ConditionBlocked
+    with pytest.raises(ConditionBlocked):
+        engine.enqueue_program(engine.find_program("p1"))
+    hass.states.async_set("sensor.precip", "no_rain")
+    await engine._trigger_scheduled(engine.find_program("p1"))
+    await asyncio.sleep(0.3)
+    assert _on(hass) == [ZONES[0]]
+    # Battery drops while watering: next sprinkler must not start
+    hass.states.async_set("sensor.soc", "15")
+    await _wait_idle(hass, engine)
+    last = engine.store.history[0]
+    assert last["status"] == "stopped" and "Battery" in last["reason"]
+    assert [z["zone_id"] for z in last["zones"]] == ["z1"]
+    assert _on(hass) == [] and hass.states.get("input_boolean.pump").state == "off"
+
+
+async def test_template_condition_and_ws_check(hass, hass_ws_client):
+    _, engine = await _setup(hass)
+    cond = {"id": "c1", "type": "template", "template": "{{ states('sensor.soc') | float(0) > 50 }}"}
+    ok, _ = engine.evaluate(model.normalize_condition(cond))
+    assert ok
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 1, "type": f"{DOMAIN}/check_conditions", "conditions": [
+        cond, {"id": "c2", "type": "numeric", "entity_id": "sensor.soc", "below": 50}]})
+    msg = await client.receive_json()
+    assert [(r["id"], r["ok"]) for r in msg["result"]] == [("c1", True), ("c2", False)]
+
+
+async def test_unavailable_sprinkler_is_skipped(hass):
+    _, engine = await _setup(hass)
+    await _configure(engine, concurrency=1, minutes=0.03)
+    hass.states.async_set(ZONES[0], "unavailable")
+    engine.enqueue_program(engine.find_program("p1"))
+    await _wait_idle(hass, engine)
+    last = engine.store.history[0]
+    assert last["status"] == "completed"
+    assert last["zones"][0] == {**last["zones"][0], "zone_id": "z1", "seconds": 0, "skipped": "unavailable"}
+    assert [z["zone_id"] for z in last["zones"]][1:] == ["z2", "z3", "z4"]

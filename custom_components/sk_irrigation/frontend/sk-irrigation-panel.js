@@ -1,8 +1,8 @@
 // SK Irrigation Manager — Home Assistant panel.
 // Dependency-free web component: renders with template strings, uses event
 // delegation, and implements pointer-based drag & drop (mouse + touch).
-import { I18N } from "./sk-irrigation-i18n.js?v=1.1.0";
-import { STYLES } from "./sk-irrigation-styles.js?v=1.1.0";
+import { I18N } from "./sk-irrigation-i18n.js?v=1.2.0";
+import { STYLES } from "./sk-irrigation-styles.js?v=1.2.0";
 
 const DOMAIN = "sk_irrigation";
 const TABS = [
@@ -219,11 +219,11 @@ class SkIrrigationPanel extends HTMLElement {
 
   _toast(text) {
     clearTimeout(this._toastTimer);
-    this._toastText = text;
-    let el = this.shadowRoot.querySelector(".toast");
-    if (!el) { el = document.createElement("div"); el.className = "toast"; this.shadowRoot.appendChild(el); }
+    const el = this._toastEl || (this._toastEl = document.createElement("div"));
+    el.className = "toast";
     el.textContent = text;
-    this._toastTimer = setTimeout(() => { el.remove(); }, 2400);
+    this.shadowRoot.appendChild(el);
+    this._toastTimer = setTimeout(() => { el.remove(); this._toastTimer = null; }, text.length > 40 ? 5000 : 2400);
   }
 
   _fmtWhen(iso) {
@@ -318,10 +318,15 @@ class SkIrrigationPanel extends HTMLElement {
         ${this._config && !this._can() ? `<div class="banner"><ha-icon icon="mdi:lock-outline"></ha-icon>${this.t("read_only")}</div>` : ""}
         ${body}</main></div>
       ${this._dialog ? this._dialogHtml() : ""}`;
+    if (this._toastEl?.textContent && this._toastEl.isConnected === false && this._toastTimer) sr.appendChild(this._toastEl);
     const newScroller = sr.querySelector(".scroller");
     if (newScroller) newScroller.scrollTop = scroll;
     const mb = sr.querySelector("ha-menu-button");
     if (mb) { mb.hass = this._hass; mb.narrow = this._narrow; }
+    if (this._tab === "settings" || (this._tab === "programs" && this._edit)) {
+      sr.querySelector("main").insertAdjacentHTML("beforeend", this._entityDatalist());
+      this._scheduleCondCheck();
+    }
     this._tick();
   }
 
@@ -348,6 +353,8 @@ class SkIrrigationPanel extends HTMLElement {
 
   // live countdowns / progress without re-rendering
   _tick() {
+    this._ticks = (this._ticks || 0) + 1;
+    if (this._ticks % 10 === 0 && this.shadowRoot.querySelector("[data-cond-res]")) this._checkConditions();
     const now = this._now();
     this.shadowRoot.querySelectorAll("[data-end]").forEach((el) => {
       const end = Date.parse(el.dataset.end);
@@ -462,11 +469,7 @@ class SkIrrigationPanel extends HTMLElement {
     const s = this._config.settings;
     const delay = s.rain_delay_until && Date.parse(s.rain_delay_until) > this._now() ? s.rain_delay_until : null;
     const reasons = st.blocking.filter((r) => r !== "system_disabled");
-    const label = (r) => {
-      const [k, v] = r.split(":");
-      const txt = this.t(`blocking_${k}`);
-      return v && k !== "rain_delay" ? `${txt}: ${esc(k === "rain_sensor" ? this._entityName(r.slice(k.length + 1)) : v)}` : txt;
-    };
+    const label = (r) => esc(this._reasonText(r));
     return `<div class="card"><div class="hd"><h2><ha-icon icon="mdi:shield-check-outline"></ha-icon>${this.t("conditions")}</h2></div><div class="bd">
       <div class="toggle-row"><ha-icon icon="mdi:water-pump"></ha-icon><span class="lbl">${this.t("system_enabled")}</span>
         <label class="switch"><input type="checkbox" data-bind="system" ${s.enabled ? "checked" : ""} ${this._can() ? "" : "disabled"}><span class="tr"></span></label></div>
@@ -670,7 +673,10 @@ class SkIrrigationPanel extends HTMLElement {
             <span><ha-icon icon="mdi:clock-outline"></ha-icon>${p.start_times.map((s) => this._startText(s)).join(", ") || "—"}</span>
             <span><ha-icon icon="mdi:timer-sand"></ha-icon>${fmtDur(sim.total)}</span>
             <span><ha-icon icon="mdi:calendar-arrow-right"></ha-icon>${p.enabled ? this._fmtWhen(next) : this.t("program_disabled")}</span>
+            ${p.conditions?.length ? `<span><ha-icon icon="mdi:shield-check-outline"></ha-icon>${p.conditions.length} ${this.t("conditions_lc")}</span>` : ""}
           </div>
+          ${(this._state.program_blocks?.[p.id] || []).length ? `<div class="badge amber" style="margin-top:8px;white-space:normal">
+            <ha-icon icon="mdi:alert-outline" style="--mdc-icon-size:14px"></ha-icon>${this.t("now_blocked")}: ${esc(this._state.program_blocks[p.id].map((r) => this._reasonText(r)).join(", "))}</div>` : ""}
           <div class="chips" style="margin-top:10px">${p.steps.map((s, i) => {
             const g = this._group(s.group_id);
             return g ? `<span class="zpill"><span class="swatch" style="background:${esc(g.color)}"></span>${i + 1}. ${esc(g.name)}
@@ -697,7 +703,7 @@ class SkIrrigationPanel extends HTMLElement {
         anchor_date: `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`,
         month_days: [], dates: [], months: [] },
       start_times: [{ type: "fixed", time: "06:00" }],
-      steps: [], budget: 100, zone_delay_s: -1, step_delay_s: -1, ignore_conditions: false, on_busy: "queue",
+      steps: [], budget: 100, zone_delay_s: -1, step_delay_s: -1, ignore_conditions: false, on_busy: "queue", conditions: [],
     };
   }
 
@@ -772,8 +778,9 @@ class SkIrrigationPanel extends HTMLElement {
           ${section(1, "", this.t("general"), general)}
           ${section(2, "", this.t("calendar"), calendar)}
           ${section(3, "", this.t("start_times"), starts)}
-          ${section(4, "", this.t("sequence"), sequence)}
-          ${section(5, "", this.t("advanced"), advanced)}
+          ${section(4, "", this.t("conditions_title"), `<p class="hint">${this.t("prog_cond_hint")}</p>${this._condEditorHtml("prog")}`)}
+          ${section(5, "", this.t("sequence"), sequence)}
+          ${section(6, "", this.t("advanced"), advanced)}
         </div>
         <div class="side">
           <div class="card"><div class="hd"><h3><ha-icon icon="mdi:vector-arrange-below"></ha-icon>${this.t("groups_palette")}</h3></div><div class="bd">
@@ -882,6 +889,107 @@ class SkIrrigationPanel extends HTMLElement {
     if (foot) foot.innerHTML = `<ha-icon icon="mdi:circle-medium" style="color:var(--ski-amber)"></ha-icon>${this.t("unsaved")}`;
   }
 
+  // ------------------------------------------------------------ conditions
+  // Visual builder for custom conditions (state / numeric / template). Used for
+  // global conditions (settings) and per-program conditions (editor draft).
+  _condList(scope) {
+    if (scope === "settings") return (this._config.settings.conditions = this._config.settings.conditions || []);
+    return (this._edit.conditions = this._edit.conditions || []);
+  }
+
+  _reasonText(r) {
+    const i = r.indexOf(":");
+    const k = i < 0 ? r : r.slice(0, i);
+    const v = i < 0 ? "" : r.slice(i + 1);
+    if (k === "condition") return v;
+    if (k === "rain_sensor") return `${this.t("blocking_rain_sensor")}: ${this._entityName(v)}`;
+    if (k === "rain_delay" || !v) return this.t(`blocking_${k}`);
+    return `${this.t(`blocking_${k}`)}: ${v}`;
+  }
+
+  _condBadge(r) {
+    if (!r) return `<span class="badge">…</span>`;
+    const detail = r.detail ? `<span class="small muted">${esc(r.detail.replace(/^= /, ""))}</span>` : "";
+    return r.ok
+      ? `<span class="badge green"><ha-icon icon="mdi:check" style="--mdc-icon-size:14px"></ha-icon>${this.t("cond_ok")}</span>${detail}`
+      : `<span class="badge amber"><ha-icon icon="mdi:close" style="--mdc-icon-size:14px"></ha-icon>${this.t("cond_fail")}</span>${detail}`;
+  }
+
+  _entityDatalist() {
+    return `<datalist id="ski-entities">${Object.keys(this._hass.states).sort()
+      .map((id) => `<option value="${esc(id)}">${esc(this._entityName(id))}</option>`).join("")}</datalist>`;
+  }
+
+  _condEditorHtml(scope) {
+    const list = this._condList(scope);
+    const res = this._condResults || {};
+    const can = this._can();
+    const types = ["state", "numeric", "template"];
+    return `<div class="stack" style="gap:10px">
+      ${list.map((c, i) => {
+        const b = `cond:${scope}:${i}`;
+        let body;
+        if (c.type === "template") {
+          body = `<textarea rows="3" spellcheck="false" data-bind="${b}:template" placeholder="{{ states('sensor.lluvia_hoy') | float(0) < 5 }}">${esc(c.template)}</textarea>
+            <div class="small muted">${this.t("cond_template_hint")}</div>`;
+        } else {
+          const entity = `<label class="field" style="flex:2;min-width:220px"><span>${this.t("cond_entity")}</span>
+            <input type="text" list="ski-entities" value="${esc(c.entity_id || "")}" data-bind="${b}:entity_id" placeholder="sensor.…" spellcheck="false"></label>`;
+          const attrib = `<label class="field" style="flex:1;min-width:120px"><span>${this.t("cond_attribute")}</span>
+            <input type="text" value="${esc(c.attribute || "")}" data-bind="${b}:attribute" spellcheck="false"></label>`;
+          body = c.type === "numeric"
+            ? `<div class="row wrap" style="align-items:flex-end">${entity}${attrib}
+                <label class="field"><span>${this.t("cond_above")}</span><input type="number" step="any" value="${c.above ?? ""}" data-bind="${b}:above"></label>
+                <label class="field"><span>${this.t("cond_below")}</span><input type="number" step="any" value="${c.below ?? ""}" data-bind="${b}:below"></label></div>`
+            : `<div class="row wrap" style="align-items:flex-end">${entity}${attrib}
+                <label class="field"><span>&nbsp;</span><select data-bind="${b}:operator">
+                  <option value="is" ${c.operator !== "not" ? "selected" : ""}>${this.t("op_is")}</option>
+                  <option value="not" ${c.operator === "not" ? "selected" : ""}>${this.t("op_not")}</option></select></label>
+                <label class="field" style="flex:1;min-width:160px"><span>${this.t("cond_states")}</span>
+                  <input type="text" value="${esc((c.states || []).join(", "))}" data-bind="${b}:states" placeholder="no_rain"></label></div>`;
+        }
+        return `<div class="cond-card">
+          <div class="row wrap">
+            <input type="text" class="cond-label" value="${esc(c.label)}" placeholder="${this.t("cond_label")}" data-bind="${b}:label">
+            <div class="seg">${types.map((tp) => `<button class="${c.type === tp ? "on" : ""}" data-action="cond-type" data-scope="${scope}" data-n="${i}" data-v="${tp}">${this.t(`cond_${tp}`)}</button>`).join("")}</div>
+            ${can ? `<button class="btn icon" title="${this.t("delete")}" data-action="del-cond" data-scope="${scope}" data-n="${i}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>` : ""}
+          </div>
+          <div class="cond-res row" data-cond-res="${esc(c.id)}">${this._condBadge(res[c.id])}</div>
+          ${body}
+          <div class="row wrap" style="gap:18px">
+            <div class="row"><label class="switch"><input type="checkbox" data-bind="${b}:recheck" ${c.recheck ? "checked" : ""}><span class="tr"></span></label>
+              <span class="small">${this.t("cond_recheck")}</span></div>
+            ${c.type === "template" ? "" : `<div class="row small"><span class="muted">${this.t("cond_unavail")}</span>
+              <select style="width:auto;min-height:32px;padding:4px 8px" data-bind="${b}:unavailable">
+                <option value="fail" ${c.unavailable !== "pass" ? "selected" : ""}>${this.t("unavail_fail")}</option>
+                <option value="pass" ${c.unavailable === "pass" ? "selected" : ""}>${this.t("unavail_pass")}</option></select></div>`}
+          </div>
+        </div>`;
+      }).join("")}
+      ${list.length ? "" : `<div class="muted small">${this.t("no_conditions")}</div>`}
+      ${can ? `<div><button class="btn sm" data-action="add-cond" data-scope="${scope}"><ha-icon icon="mdi:plus"></ha-icon>${this.t("add_condition")}</button></div>` : ""}
+    </div>`;
+  }
+
+  _scheduleCondCheck() {
+    clearTimeout(this._condTimer);
+    this._condTimer = setTimeout(() => this._checkConditions(), 350);
+  }
+
+  async _checkConditions() {
+    let conds = [];
+    if (this._tab === "settings" && this._config) conds = this._config.settings.conditions || [];
+    else if (this._tab === "programs" && this._edit) conds = this._edit.conditions || [];
+    if (!conds.length) return;
+    try {
+      const res = await this._hass.callWS({ type: `${DOMAIN}/check_conditions`, conditions: conds });
+      this._condResults = Object.fromEntries(res.map((r) => [r.id, r]));
+      this.shadowRoot.querySelectorAll("[data-cond-res]").forEach((el) => {
+        el.innerHTML = this._condBadge(this._condResults[el.dataset.condRes]);
+      });
+    } catch (err) { /* ignore */ }
+  }
+
   // ------------------------------------------------------------ settings tab
   _render_settings() {
     const s = this._config.settings;
@@ -916,6 +1024,12 @@ class SkIrrigationPanel extends HTMLElement {
         <label class="field" style="margin-top:14px"><span>${this.t("weather_conditions")}</span></label>
         <div class="chips" style="margin-top:6px">${WEATHER.map((w) => `<button class="chip ${s.weather_conditions.includes(w) ? "on" : ""}" data-action="toggle-weather" data-id="${w}" ${can}>${w}</button>`).join("")}</div>
       </div></div>
+      <div class="card" style="grid-column:1/-1"><div class="hd"><h2><ha-icon icon="mdi:shield-check-outline"></ha-icon>${this.t("s_custom_conditions")}</h2></div><div class="bd">
+        <p class="hint">${this.t("custom_cond_hint")}</p>
+        <div class="toggle-row"><span class="lbl">${this.t("manual_conditions")}</span>
+          <label class="switch"><input type="checkbox" data-bind="settings:manual_conditions" ${s.manual_conditions !== false ? "checked" : ""} ${can}><span class="tr"></span></label></div>
+        ${this._condEditorHtml("settings")}
+      </div></div>
       <div class="card"><div class="hd"><h2><ha-icon icon="mdi:pipe-valve"></ha-icon>${this.t("s_hydraulics")}</h2></div><div class="bd"><div class="fields">
         ${ent("master_entity", this.t("master_entity"), ["switch", "valve", "input_boolean", "light", "fan"])}
         ${num("master_lead_s", this.t("master_lead"), 0, 600)}
@@ -947,7 +1061,7 @@ class SkIrrigationPanel extends HTMLElement {
         const water = (h.zones || []).reduce((a, z) => a + ((this._zone(z.zone_id)?.flow_rate || 0) * z.seconds) / 60, 0);
         return `<tr><td class="tnum">${this._fmtWhen(h.start)}</td>
           <td><b>${esc(h.name)}</b>${h.zones?.length ? `<div class="small muted">${h.zones.map((z) => `${esc(this._zone(z.zone_id)?.name || "?")} ${fmtDur(z.seconds)}`).join(" · ")}</div>` : ""}
-            ${h.reason && h.status !== "completed" ? `<div class="small muted">${esc(h.reason)}</div>` : ""}</td>
+            ${h.reason && h.status !== "completed" ? `<div class="small muted">${esc(h.reason.split(", condition:").map((r) => this._reasonText(r)).join(", "))}</div>` : ""}</td>
           <td>${this.t(`src_${h.source}`)}</td><td><span class="badge ${cls[h.status] || ""}">${this.t(`stat_${h.status}`)}</span></td>
           <td class="tnum">${h.status === "skipped" ? "—" : fmtDur(secs)}</td><td class="tnum">${water ? `${Math.round(water)} L` : "—"}</td></tr>`;
       }).join("")}</tbody></table></div></div></div>`;
@@ -1021,6 +1135,7 @@ class SkIrrigationPanel extends HTMLElement {
       case "skip": await this._action("skip", id ? { target: id } : {}); return;
       case "run-program": {
         const res = await this._action("run_program", { target: id });
+        if (res?.blocked) { this._toast(`${this.t("blocked")}: ${res.blocked.map((r) => this._reasonText(r)).join(", ")}`); break; }
         this._toast(res?.run ? (this._state.current?.id === res.run.id ? this.t("started") : this.t("queued")) : this.t("nothing_to_water"));
         break;
       }
@@ -1036,6 +1151,7 @@ class SkIrrigationPanel extends HTMLElement {
         if (d.type === "confirm") { await d.onOk(); break; }
         const res = await this._action(d.kind === "zone" ? "run_zone" : "run_group",
           { target: d.id, minutes: Number(d.minutes) || 5, concurrency: d.concurrency });
+        if (res?.blocked) { this._toast(`${this.t("blocked")}: ${res.blocked.map((r) => this._reasonText(r)).join(", ")}`); break; }
         this._toast(res?.run ? this.t("queued") : this.t("nothing_to_water"));
         break;
       }
@@ -1062,8 +1178,8 @@ class SkIrrigationPanel extends HTMLElement {
         const d = this._dialog;
         const z = this._zoneByEntity(d.entity_id);
         if (!z) { this._ensureZone(d.entity_id); await this._saveNow("layout"); }
-        await this._action("run_zone", { target: d.entity_id, minutes: 1 });
-        this._toast(this.t("queued"));
+        const res = await this._action("run_zone", { target: d.entity_id, minutes: 1 });
+        this._toast(res?.blocked ? `${this.t("blocked")}: ${res.blocked.map((r) => this._reasonText(r)).join(", ")}` : this.t("queued"));
         return;
       }
       case "zone-delete": {
@@ -1078,6 +1194,20 @@ class SkIrrigationPanel extends HTMLElement {
         break;
       }
       case "groups-from-areas": this._groupsFromAreas(); break;
+      // conditions
+      case "add-cond":
+      case "del-cond":
+      case "cond-type": {
+        const scope = el.dataset.scope;
+        const list = this._condList(scope);
+        if (a === "add-cond") {
+          list.push({ id: uid("cond"), type: "state", label: "", entity_id: null, attribute: null, operator: "is",
+            states: [], above: null, below: null, template: "", recheck: false, unavailable: "fail" });
+        } else if (a === "del-cond") list.splice(n, 1);
+        else list[n].type = el.dataset.v;
+        if (scope === "settings") this._queueSave("settings"); else this._dirty = true;
+        break;
+      }
       // groups
       case "new-group": this._createGroup([]); break;
       case "delete-group":
@@ -1274,6 +1404,16 @@ class SkIrrigationPanel extends HTMLElement {
         break;
       }
       case "dlgz": this._dialog.draft[a] = v; return;
+      case "cond": {
+        const [, scope, idx, field] = bind.split(":");
+        const c = this._condList(scope)[Number(idx)];
+        if (field === "states") v = String(v).split(",").map((x) => x.trim()).filter(Boolean);
+        if (["entity_id", "attribute"].includes(field)) v = String(v).trim() || null;
+        c[field] = v;
+        if (scope === "settings") this._queueSave("settings"); else { this._dirty = true; this._refreshPreview(); }
+        this._scheduleCondCheck();
+        return;
+      }
       case "import": {
         const file = el.files?.[0];
         if (!file) return;

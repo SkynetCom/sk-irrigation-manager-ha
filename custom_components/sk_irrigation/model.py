@@ -14,7 +14,12 @@ import uuid
 from typing import Any
 
 from .const import (
+    COND_NUMERIC,
+    COND_STATE,
+    COND_TEMPLATE,
+    COND_TYPES,
     DEFAULT_SETTINGS,
+    UNAVAILABLE_STATES,
     DURATION_CUSTOM,
     DURATION_UNIFORM,
     MODE_DATES,
@@ -172,6 +177,78 @@ def step_zone_order(step: dict, group: dict) -> list[str]:
     return ordered + [z for z in members if z not in ordered]
 
 
+def normalize_condition(raw: Any) -> dict | None:
+    """A user-built condition: entity state, numeric threshold or Jinja template."""
+    if not isinstance(raw, dict):
+        return None
+    ctype = raw.get("type") if raw.get("type") in COND_TYPES else COND_STATE
+    states = raw.get("states", [])
+    if isinstance(states, str):
+        states = states.split(",")
+    return {
+        "id": _str(raw.get("id")) or new_id("cond"),
+        "type": ctype,
+        "label": _str(raw.get("label")),
+        "entity_id": _opt_entity(raw.get("entity_id")),
+        "attribute": _str(raw.get("attribute")) or None,
+        "operator": "not" if raw.get("operator") == "not" else "is",
+        "states": [s for s in (_str(x) for x in states) if s],
+        "above": _float(raw.get("above"), None, -1e9, 1e9),
+        "below": _float(raw.get("below"), None, -1e9, 1e9),
+        "template": str(raw.get("template") or "")[:4000],
+        "recheck": bool(raw.get("recheck", False)),
+        "unavailable": "pass" if raw.get("unavailable") == "pass" else "fail",
+    }
+
+
+def normalize_conditions(raw: Any) -> list[dict]:
+    if not isinstance(raw, list):
+        return []
+    return [c for c in (normalize_condition(r) for r in raw) if c]
+
+
+def evaluate_condition(cond: dict, value: Any) -> tuple[bool, str]:
+    """Evaluate a state/numeric condition against the entity value.
+
+    Returns ``(ok, detail)``; ``detail`` describes the current value so the UI
+    and history can explain why a run was skipped.
+    """
+    entity = cond.get("entity_id") or "?"
+    if cond.get("attribute"):
+        entity = f"{entity}.{cond['attribute']}"
+    if value is None or str(value).strip().lower() in UNAVAILABLE_STATES:
+        return cond.get("unavailable") == "pass", f"{entity} = unavailable"
+    if cond["type"] == COND_NUMERIC:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return cond.get("unavailable") == "pass", f"{entity} = {value} (no numérico)"
+        ok = (cond.get("above") is None or number > cond["above"]) and \
+             (cond.get("below") is None or number < cond["below"])
+        return ok, f"{entity} = {number:g}"
+    match = str(value) in (cond.get("states") or [])
+    ok = match if cond.get("operator", "is") == "is" else not match
+    return ok, f"{entity} = {value}"
+
+
+def describe_condition(cond: dict) -> str:
+    """Short human label used when the user did not name the condition."""
+    if cond.get("label"):
+        return cond["label"]
+    if cond["type"] == COND_TEMPLATE:
+        return "template"
+    entity = cond.get("entity_id") or "?"
+    if cond["type"] == COND_NUMERIC:
+        parts = []
+        if cond.get("above") is not None:
+            parts.append(f"> {cond['above']:g}")
+        if cond.get("below") is not None:
+            parts.append(f"< {cond['below']:g}")
+        return f"{entity} {' y '.join(parts)}"
+    op = "=" if cond.get("operator") == "is" else "≠"
+    return f"{entity} {op} {', '.join(cond.get('states') or [])}"
+
+
 def normalize_program(raw: dict, group_ids: set[str], zone_ids: set[str]) -> dict:
     starts = [s for s in (normalize_start_time(s) for s in raw.get("start_times", []) or []) if s]
     steps = [s for s in (normalize_step(s, group_ids, zone_ids) for s in raw.get("steps", []) or []) if s]
@@ -188,6 +265,7 @@ def normalize_program(raw: dict, group_ids: set[str], zone_ids: set[str]) -> dic
         "step_delay_s": _int(raw.get("step_delay_s"), -1, -1, 3600),
         "ignore_conditions": bool(raw.get("ignore_conditions", False)),
         "on_busy": "skip" if raw.get("on_busy") == "skip" else "queue",
+        "conditions": normalize_conditions(raw.get("conditions")),
     }
 
 
@@ -213,6 +291,8 @@ def normalize_settings(raw: dict | None) -> dict:
     out["max_zone_minutes"] = _int(raw.get("max_zone_minutes"), 120, 1, 720)
     out["history_size"] = _int(raw.get("history_size"), 60, 5, 500)
     out["notify_service"] = _str(raw.get("notify_service")) or None
+    out["conditions"] = normalize_conditions(raw.get("conditions"))
+    out["manual_conditions"] = bool(raw.get("manual_conditions", True))
     return out
 
 

@@ -130,3 +130,20 @@ def test_step_order_and_skip():
 def test_order_keeps_new_group_members():
     group = {"zone_ids": ["a", "b", "c"]}
     assert m.step_zone_order({"order": ["c", "x"]}, group) == ["c", "a", "b"]
+
+
+def test_condition_state_numeric_unavailable():
+    rain = m.normalize_condition({"type": "state", "entity_id": "sensor.desc", "states": "no_rain"})
+    assert m.evaluate_condition(rain, "no_rain")[0]
+    assert not m.evaluate_condition(rain, "light_rain")[0]
+    assert not m.evaluate_condition(rain, "unavailable")[0]  # default: unavailable blocks
+    not_rain = m.normalize_condition({"entity_id": "sensor.desc", "operator": "not", "states": ["rain", "storm"]})
+    assert m.evaluate_condition(not_rain, "sunny")[0] and not m.evaluate_condition(not_rain, "storm")[0]
+    mm = m.normalize_condition({"type": "numeric", "entity_id": "sensor.mm", "below": 5, "unavailable": "pass"})
+    assert m.evaluate_condition(mm, "4.9")[0] and not m.evaluate_condition(mm, "5")[0]
+    assert m.evaluate_condition(mm, "unknown")[0]  # like float(0) in a template
+    soc = m.normalize_condition({"type": "numeric", "entity_id": "sensor.soc", "above": 20})
+    assert m.evaluate_condition(soc, 21)[0] and not m.evaluate_condition(soc, "20")[0]
+    assert "sensor.soc > 20" == m.describe_condition(soc)
+    cfg = m.normalize_all({"settings": {"conditions": [{"type": "numeric", "entity_id": "sensor.soc", "above": 20}]}})
+    assert cfg["settings"]["conditions"][0]["above"] == 20.0

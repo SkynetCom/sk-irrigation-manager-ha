@@ -16,6 +16,8 @@ Gestor de riego profesional para Home Assistant con **panel propio**, **grupos d
 
 ![Programas (tema oscuro)](docs/programs.png)
 
+![Condiciones personalizadas](docs/conditions.png)
+
 ---
 
 ## ¿Por qué otro módulo de riego?
@@ -51,7 +53,9 @@ Ideas tomadas de cada uno: la potencia de secuencias de *Irrigation Unlimited*, 
   - Ajuste de tiempos (%), pausa entre aspersores y entre grupos, qué hacer si hay otro riego en curso (encolar u omitir), ignorar sensores.
   - **Vista previa** con duración estimada, consumo de agua y **línea de tiempo (Gantt)**.
 - **Panel en vivo**: progreso general, aspersores activos con cuenta regresiva, saltar zona, detener todo, cola de ejecución y riego manual de zonas o grupos.
-- **Condiciones**: sensores de lluvia, entidad de clima (condiciones configurables), temperatura de helada, retraso por lluvia (24/48/72 h), presupuesto global o por sensor.
+- **Condiciones**: sensores de lluvia, entidad de clima, temperatura de helada, retraso por lluvia (24/48/72 h) y presupuesto global o por sensor.
+- **Condiciones personalizadas sin YAML** (globales o por programa): estado (`no_rain`), numéricas (lluvia acumulada < 5 mm, batería > 20 %, generador < 50 W…) o plantillas Jinja, con ✓/✗ en vivo. Se pueden **re-verificar antes de cada aspersor y durante el riego** para cortar si cambia la energía, y elegir qué hacer si el sensor no está disponible.
+- Si un aspersor está `unavailable`, se saltea y la secuencia sigue.
 - **Hidráulica**: válvula maestra o bomba con adelanto/retardo y **límite global de zonas simultáneas** (protege la presión del sistema).
 - **Seguridad**: si HA se reinicia durante un riego, al volver cierra todas las válvulas; si alguien apaga una zona manualmente, la secuencia continúa con la siguiente; tiempo máximo por zona.
 - **Historial** con duración y litros estimados, notificaciones opcionales y **exportar/importar** la configuración en JSON.
@@ -81,7 +85,8 @@ Copiá `custom_components/sk_irrigation` en `config/custom_components/` y reinic
 | `sensor.sk_irrigation_manager_estado` | `idle`, `running`, `paused`, `rain_delay`, `disabled` (+ atributos: programa, zonas activas, cola, motivos) |
 | `sensor.sk_irrigation_manager_proximo_riego` | Fecha/hora del próximo riego |
 | `sensor.sk_irrigation_manager_tiempo_restante` | Minutos restantes del riego actual |
-| `sensor.sk_irrigation_manager_zonas_activas` | Cantidad de zonas regando |
+| `sensor.sk_irrigation_manager_zonas_activas` | Cantidad de aspersores regando |
+| `sensor.sk_irrigation_manager_aspersor_actual` | Aspersor regando ahora, con `ends_at` y `remaining_seconds` |
 
 Servicios: `sk_irrigation.run_program`, `run_group`, `run_zone`, `stop_all`, `skip`, `set_rain_delay`.
 

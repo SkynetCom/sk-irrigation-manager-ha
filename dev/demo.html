@@ -56,6 +56,11 @@ for (const [id, name] of [["valve.goteo_huerta", "Goteo huerta"], ["switch.bomba
 }
 states["binary_sensor.rain"] = { entity_id: "binary_sensor.rain", state: "off", attributes: { friendly_name: "Sensor de lluvia" } };
 states["weather.home"] = { entity_id: "weather.home", state: "sunny", attributes: { friendly_name: "Clima casa" } };
+for (const [id, v, n] of [["sensor.the_ark_sensors_precipitation_description", "no_rain", "Descripción de lluvia"],
+  ["sensor.the_ark_sensors_precipitation_today", "0.4", "Lluvia hoy (mm)"], ["sensor.the_ark_sensors_precipitation_yesterday", "6.2", "Lluvia ayer (mm)"],
+  ["sensor.solark_total_grid_power", "0", "Potencia red/generador (W)"], ["sensor.solark_system_soc", "64", "Batería (%)"]]) {
+  states[id] = { entity_id: id, state: v, attributes: { friendly_name: n } };
+}
 states["sensor.temp_ext"] = { entity_id: "sensor.temp_ext", state: "14", attributes: { friendly_name: "Temperatura exterior" } };
 
 const C = ["#2e9e6b", "#1e88e5", "#f2a900", "#e5533d", "#8e44ad", "#00a6a6"];
@@ -89,7 +94,14 @@ const config = {
   settings: { enabled: true, rain_delay_until: null, rain_sensors: ["binary_sensor.rain"], weather_entity: "weather.home",
     weather_conditions: ["rainy", "pouring", "lightning-rainy", "snowy", "snowy-rainy", "hail"], freeze_sensor: "sensor.temp_ext",
     freeze_threshold: 3, budget_entity: null, global_budget: 100, master_entity: "switch.bomba_pozo", master_lead_s: 3,
-    master_lag_s: 3, max_concurrent: 0, zone_delay_s: 5, step_delay_s: 10, max_zone_minutes: 120, history_size: 60, notify_service: null },
+    master_lag_s: 3, max_concurrent: 0, zone_delay_s: 5, step_delay_s: 10, max_zone_minutes: 120, history_size: 60, notify_service: null, manual_conditions: true,
+    conditions: [
+      { id: "c1", type: "state", label: "No está lloviendo", entity_id: "sensor.the_ark_sensors_precipitation_description", attribute: null, operator: "is", states: ["no_rain"], above: null, below: null, template: "", recheck: false, unavailable: "fail" },
+      { id: "c2", type: "numeric", label: "Lluvia hoy < 5 mm", entity_id: "sensor.the_ark_sensors_precipitation_today", attribute: null, operator: "is", states: [], above: null, below: 5, template: "", recheck: false, unavailable: "pass" },
+      { id: "c3", type: "numeric", label: "Lluvia ayer < 5 mm", entity_id: "sensor.the_ark_sensors_precipitation_yesterday", attribute: null, operator: "is", states: [], above: null, below: 5, template: "", recheck: false, unavailable: "pass" },
+      { id: "c4", type: "numeric", label: "Generador apagado (< 50 W)", entity_id: "sensor.solark_total_grid_power", attribute: null, operator: "is", states: [], above: null, below: 50, template: "", recheck: true, unavailable: "fail" },
+      { id: "c5", type: "numeric", label: "Batería > 20 %", entity_id: "sensor.solark_system_soc", attribute: null, operator: "is", states: [], above: 20, below: null, template: "", recheck: true, unavailable: "fail" },
+    ] },
 };
 let current = null;
 const queue = [];
@@ -113,7 +125,8 @@ function state() {
   const np = config.programs.find((p) => p.enabled);
   return { now: iso(Date.now()), status: current ? "running" : config.settings.enabled ? "idle" : "disabled",
     current, queue: queue.map((r) => ({ id: r.id, name: r.name, source: r.source, zones: r.zones })),
-    blocking: config.settings.enabled ? [] : ["system_disabled"], budget: config.settings.global_budget, next_runs,
+    blocking: [...(config.settings.enabled ? [] : ["system_disabled"]), ...condFailures(config.settings.conditions)],
+    program_blocks: Object.fromEntries(config.programs.filter((p) => p.conditions?.length).map((p) => [p.id, condFailures(p.conditions)])), budget: config.settings.global_budget, next_runs,
     next: np ? { program_id: np.id, name: np.name, at: next_runs[np.id] } : null, zone_stats: zoneStats, history };
 }
 function push(withConfig) { listeners.forEach((cb) => cb({ state: state(), ...(withConfig ? { config } : {}) })); }
@@ -165,7 +178,18 @@ setInterval(() => {
   if (changed) { panel.hass = { ...hass, states: { ...states } }; push(); }
 }, 500);
 
+function evalCond(c) {
+  if (c.type === "template") return { ok: true, detail: "= True" };
+  const st = states[c.entity_id]; const v = st ? (c.attribute ? st.attributes[c.attribute] : st.state) : null;
+  const name = c.entity_id || "?";
+  if (v == null || ["unavailable", "unknown", ""].includes(String(v))) return { ok: c.unavailable === "pass", detail: `${name} = unavailable` };
+  if (c.type === "numeric") { const n = Number(v); return { ok: (c.above == null || n > c.above) && (c.below == null || n < c.below), detail: `${name} = ${n}` }; }
+  const m = (c.states || []).includes(String(v)); return { ok: c.operator === "not" ? !m : m, detail: `${name} = ${v}` };
+}
+const condFailures = (list) => (list || []).map((c) => [c, evalCond(c)]).filter(([, r]) => !r.ok)
+  .map(([c, r]) => `condition:${c.label || c.entity_id} (${r.detail})`);
 const handlers = {
+  "sk_irrigation/check_conditions": (m) => m.conditions.map((c) => ({ id: c.id, ...evalCond(c) })),
   "sk_irrigation/data": () => ({ version: "1.0.0-demo", config, state: state(), candidates, is_admin: true }),
   "sk_irrigation/save": (m) => {
     const v = JSON.parse(JSON.stringify(m.value));
@@ -175,6 +199,11 @@ const handlers = {
   "sk_irrigation/import": (m) => { Object.assign(config, m.config); push(true); return { config }; },
   "sk_irrigation/action": (m) => {
     let run = null;
+    if (["run_program", "run_group", "run_zone"].includes(m.action) && config.settings.manual_conditions) {
+      const p = m.action === "run_program" ? config.programs.find((x) => x.id === m.target) : null;
+      const blocked = condFailures([...config.settings.conditions, ...(p?.conditions || [])]);
+      if (blocked.length) return { run: null, blocked, state: state() };
+    }
     if (m.action === "run_program") { const p = config.programs.find((x) => x.id === m.target); run = enqueue(p.name, "manual", planProgram(p), p.id); }
     if (m.action === "run_zone") { const z = config.zones.find((x) => x.id === m.target || x.entity_id === m.target); run = enqueue(z.name, "manual", [{ label: z.name, concurrency: 1, zones: [{ zone_id: z.id, seconds: m.minutes * 60 }] }]); }
     if (m.action === "run_group") { const g = config.groups.find((x) => x.id === m.target); run = enqueue(g.name, "manual", [{ label: g.name, concurrency: m.concurrency ?? 1, zones: g.zone_ids.map((z) => ({ zone_id: z, seconds: m.minutes * 60 })) }]); }

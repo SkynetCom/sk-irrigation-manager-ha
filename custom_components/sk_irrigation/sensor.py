@@ -19,6 +19,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     engine = entry.runtime_data
     async_add_entities([
         StatusSensor(engine), NextRunSensor(engine), RemainingSensor(engine), ActiveZonesSensor(engine),
+        CurrentZoneSensor(engine),
     ])
 
 
@@ -97,3 +98,34 @@ class ActiveZonesSensor(SKIrrigationEntity, SensorEntity):
     def native_value(self) -> int:
         run = self.engine.current
         return len(run.active) if run else 0
+
+
+class CurrentZoneSensor(SKIrrigationEntity, SensorEntity):
+    """Sprinkler(s) watering right now, with per-sprinkler end time (replaces a helper timer)."""
+
+    _attr_translation_key = "current_zone"
+    _attr_icon = "mdi:sprinkler-variant"
+
+    def __init__(self, engine) -> None:
+        super().__init__(engine, "current_zone")
+
+    def _active(self) -> list:
+        run = self.engine.current
+        return sorted(run.active.values(), key=lambda a: a.ends) if run else []
+
+    @property
+    def native_value(self) -> str | None:
+        zones = self.engine.zones_by_id()
+        names = [zones[a.zone_id]["name"] for a in self._active() if a.zone_id in zones]
+        return ", ".join(names)[:255] if names else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        active = self._active()
+        now = dt_util.now()
+        return {
+            "entity_ids": [a.entity_id for a in active],
+            "ends_at": active[0].ends.isoformat() if active else None,
+            "remaining_seconds": int(max(0, (active[0].ends - now).total_seconds())) if active else 0,
+            "program": self.engine.current.name if self.engine.current else None,
+        }

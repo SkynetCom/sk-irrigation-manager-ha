@@ -236,6 +236,12 @@ label.field > span { padding-left: 2px; }
 .kpi b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
 .kpi span { font-size: 12px; color: var(--ski-muted); }
 
+/* conditions */
+.cond-card { border: 1px solid var(--ski-line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: rgba(127,127,127,.03); }
+.cond-card .cond-label { flex: 1; min-width: 160px; font-weight: 600; }
+.cond-res { gap: 6px; min-width: 110px; }
+textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; resize: vertical; }
+
 /* history table */
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th { text-align: left; font-weight: 600; color: var(--ski-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .4px; padding: 8px; border-bottom: 1px solid var(--ski-line); }

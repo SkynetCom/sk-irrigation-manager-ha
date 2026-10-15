@@ -10,7 +10,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import DOMAIN, SIGNAL_PROGRAMS_CHANGED, VERSION
-from .engine import IrrigationEngine
+from .engine import ConditionBlocked, IrrigationEngine
+from .model import normalize_conditions
 
 
 def _engine(hass: HomeAssistant) -> IrrigationEngine | None:
@@ -24,6 +25,7 @@ def async_register_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_save)
     websocket_api.async_register_command(hass, ws_import)
     websocket_api.async_register_command(hass, ws_action)
+    websocket_api.async_register_command(hass, ws_check_conditions)
 
 
 def _not_loaded(connection, msg) -> None:
@@ -108,6 +110,16 @@ async def ws_action(hass: HomeAssistant, connection: websocket_api.ActiveConnect
     engine = _engine(hass)
     if not engine:
         return _not_loaded(connection, msg)
+    try:
+        result = await _run_action(engine, msg)
+    except ConditionBlocked as err:
+        return connection.send_result(msg["id"], {"run": None, "blocked": err.reasons, "state": engine.state_dict()})
+    except LookupError as err:
+        return connection.send_error(msg["id"], "not_found", str(err))
+    connection.send_result(msg["id"], {"run": result, "state": engine.state_dict()})
+
+
+async def _run_action(engine: IrrigationEngine, msg: dict) -> Any:
     action = msg["action"]
     ref = msg.get("target")
     result: Any = None
@@ -115,19 +127,19 @@ async def ws_action(hass: HomeAssistant, connection: websocket_api.ActiveConnect
     if action == "run_program":
         program = engine.find_program(ref or "")
         if not program:
-            return connection.send_error(msg["id"], "not_found", "Program not found")
+            raise LookupError("Program not found")
         run = engine.enqueue_program(program)
         result = run.summary() if run else None
     elif action == "run_group":
         group = engine.find_group(ref or "")
         if not group:
-            return connection.send_error(msg["id"], "not_found", "Group not found")
+            raise LookupError("Group not found")
         run = engine.enqueue_group(group, msg.get("minutes", 10), msg.get("concurrency", 1))
         result = run.summary() if run else None
     elif action == "run_zone":
         zone = engine.find_zone(ref or "")
         if not zone:
-            return connection.send_error(msg["id"], "not_found", "Zone not found")
+            raise LookupError("Zone not found")
         run = engine.enqueue_zone(zone, msg.get("minutes", 5))
         result = run.summary() if run else None
     elif action == "stop":
@@ -142,4 +154,21 @@ async def ws_action(hass: HomeAssistant, connection: websocket_api.ActiveConnect
         await engine.async_set_enabled(msg.get("enabled", True))
     elif action == "set_program_enabled":
         await engine.async_set_program_enabled(ref or "", msg.get("enabled", True))
-    connection.send_result(msg["id"], {"run": result, "state": engine.state_dict()})
+    return result
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/check_conditions",
+    vol.Required("conditions"): list,
+})
+@callback
+def ws_check_conditions(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Evaluate conditions as currently drafted in the UI (live ✓ / ✗ badges)."""
+    engine = _engine(hass)
+    if not engine:
+        return _not_loaded(connection, msg)
+    out = []
+    for raw, cond in zip(msg["conditions"], normalize_conditions(msg["conditions"])):
+        ok, detail = engine.evaluate(cond)
+        out.append({"id": raw.get("id") if isinstance(raw, dict) else None, "ok": ok, "detail": detail})
+    connection.send_result(msg["id"], out)

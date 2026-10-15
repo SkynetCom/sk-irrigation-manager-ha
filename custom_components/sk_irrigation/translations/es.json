@@ -46,6 +46,9 @@
       },
       "active_zones": {
         "name": "Zonas activas"
+      },
+      "current_zone": {
+        "name": "Aspersor actual"
       }
     },
     "switch": {

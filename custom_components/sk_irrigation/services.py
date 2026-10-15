@@ -8,6 +8,7 @@ from homeassistant.exceptions import ServiceValidationError
 import homeassistant.helpers.config_validation as cv
 
 from .const import DOMAIN, SOURCE_SERVICE
+from .engine import ConditionBlocked
 
 SERVICES = ("run_program", "run_group", "run_zone", "stop_all", "skip", "set_rain_delay")
 
@@ -19,6 +20,13 @@ def _engine(hass: HomeAssistant):
     return engine
 
 
+def _guard(func, *args):
+    try:
+        return func(*args)
+    except ConditionBlocked as err:
+        raise ServiceValidationError(f"Riego no ejecutado: {', '.join(err.reasons)}") from err
+
+
 def async_register_services(hass: HomeAssistant) -> None:
     if hass.services.has_service(DOMAIN, "run_program"):
         return
@@ -28,21 +36,21 @@ def async_register_services(hass: HomeAssistant) -> None:
         program = engine.find_program(call.data["program"])
         if not program:
             raise ServiceValidationError(f"Program '{call.data['program']}' not found")
-        engine.enqueue_program(program, SOURCE_SERVICE)
+        _guard(engine.enqueue_program, program, SOURCE_SERVICE)
 
     async def run_group(call: ServiceCall) -> None:
         engine = _engine(hass)
         group = engine.find_group(call.data["group"])
         if not group:
             raise ServiceValidationError(f"Group '{call.data['group']}' not found")
-        engine.enqueue_group(group, call.data["duration"], call.data["concurrency"], SOURCE_SERVICE)
+        _guard(engine.enqueue_group, group, call.data["duration"], call.data["concurrency"], SOURCE_SERVICE)
 
     async def run_zone(call: ServiceCall) -> None:
         engine = _engine(hass)
         zone = engine.find_zone(call.data["zone"])
         if not zone:
             raise ServiceValidationError(f"Zone '{call.data['zone']}' not found")
-        engine.enqueue_zone(zone, call.data["duration"], SOURCE_SERVICE)
+        _guard(engine.enqueue_zone, zone, call.data["duration"], SOURCE_SERVICE)
 
     async def stop_all(call: ServiceCall) -> None:
         await _engine(hass).async_stop_all()

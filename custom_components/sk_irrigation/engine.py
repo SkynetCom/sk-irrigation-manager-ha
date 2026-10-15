@@ -14,10 +14,13 @@ from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_change
+from homeassistant.exceptions import TemplateError
 from homeassistant.helpers.sun import get_astral_event_date
+from homeassistant.helpers.template import Template, result_as_boolean
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    COND_TEMPLATE,
     RAINBIRD_PLATFORM,
     SIGNAL_PROGRAMS_CHANGED,
     SIGNAL_UPDATE,
@@ -31,6 +34,8 @@ from .const import (
     SUPPORTED_DOMAINS,
 )
 from .model import (
+    describe_condition,
+    evaluate_condition,
     PlannedStep,
     PlannedZone,
     build_program_plan,
@@ -45,6 +50,19 @@ from .store import IrrigationStore
 _LOGGER = logging.getLogger(__name__)
 
 EXTERNAL_OFF_GRACE = 15  # seconds before an external "off" ends a zone
+WATCHDOG_INTERVAL = 20  # seconds between condition re-checks while watering
+
+
+class ConditionBlocked(Exception):
+    """Raised when conditions prevent a run from being queued."""
+
+    def __init__(self, reasons: list[str]) -> None:
+        super().__init__(", ".join(reasons))
+        self.reasons = reasons
+
+
+class ConditionStop(Exception):
+    """Raised inside a run when a re-checked condition stops being true."""
 
 
 @dataclass
@@ -74,6 +92,8 @@ class Run:
     done: list[dict] = field(default_factory=list)
     pending: list[str] = field(default_factory=list)
     status: str = "queued"
+    recheck: list[dict] = field(default_factory=list)
+    stop_reason: str | None = None
 
     @property
     def zone_count(self) -> int:
@@ -214,6 +234,38 @@ class IrrigationEngine:
                 pass
         return float(self.settings.get("global_budget", 100))
 
+    def evaluate(self, cond: dict) -> tuple[bool, str]:
+        """Evaluate one custom condition against the live HA state."""
+        if cond["type"] == COND_TEMPLATE:
+            if not cond.get("template", "").strip():
+                return True, ""
+            try:
+                rendered = Template(cond["template"], self.hass).async_render(parse_result=False)
+            except TemplateError as err:
+                return False, f"error: {err}"
+            return result_as_boolean(rendered), f"= {rendered}"
+        if not cond.get("entity_id"):
+            return True, ""
+        st = self.hass.states.get(cond["entity_id"])
+        if st is None:
+            value = None
+        elif cond.get("attribute"):
+            value = st.attributes.get(cond["attribute"])
+        else:
+            value = st.state
+        return evaluate_condition(cond, value)
+
+    def condition_failures(self, conditions: list[dict], recheck_only: bool = False) -> list[str]:
+        out = []
+        for cond in conditions or []:
+            if recheck_only and not cond.get("recheck"):
+                continue
+            ok, detail = self.evaluate(cond)
+            if not ok:
+                label = describe_condition(cond)
+                out.append(f"condition:{label}" + (f" ({detail})" if detail and detail not in label else ""))
+        return out
+
     def blocking_reasons(self) -> list[str]:
         """Return the list of conditions that currently prevent scheduled runs."""
         s = self.settings
@@ -243,6 +295,7 @@ class IrrigationEngine:
                 temp = None
             if temp is not None and temp <= float(s.get("freeze_threshold", 3)):
                 reasons.append(f"freeze:{temp}")
+        reasons.extend(self.condition_failures(s.get("conditions", [])))
         return reasons
 
     # ------------------------------------------------------------ scheduling
@@ -296,23 +349,37 @@ class IrrigationEngine:
         reasons = [] if program.get("ignore_conditions") else self.blocking_reasons()
         if not self.settings.get("enabled", True):
             reasons = reasons or ["system_disabled"]
+        reasons += self.condition_failures(program.get("conditions", []))
         if reasons:
             _LOGGER.info("Program %s skipped: %s", program["name"], ", ".join(reasons))
-            self._record_skip(program, reasons)
+            self._record_skip(program["name"], program["id"], SOURCE_SCHEDULE, reasons)
             return
         if program.get("on_busy") == "skip" and (self.current or self.queue):
-            self._record_skip(program, ["busy"])
+            self._record_skip(program["name"], program["id"], SOURCE_SCHEDULE, ["busy"])
             return
-        self.enqueue_program(program, SOURCE_SCHEDULE)
+        recheck = ([] if program.get("ignore_conditions") else self.settings.get("conditions", [])) \
+            + program.get("conditions", [])
+        self.enqueue_program(program, SOURCE_SCHEDULE, recheck=recheck)
 
-    def _record_skip(self, program: dict, reasons: list[str]) -> None:
+    def _record_skip(self, name: str, program_id: str | None, source: str, reasons: list[str]) -> None:
         self.store.add_history({
-            "id": new_id("run"), "name": program["name"], "program_id": program["id"],
-            "source": SOURCE_SCHEDULE, "status": STATUS_SKIPPED, "reason": ", ".join(reasons),
+            "id": new_id("run"), "name": name, "program_id": program_id,
+            "source": source, "status": STATUS_SKIPPED, "reason": ", ".join(reasons),
             "start": dt_util.now().isoformat(), "end": dt_util.now().isoformat(), "zones": [],
         })
-        self._notify_service(f"⏭ {program['name']}: omitido ({', '.join(reasons)})")
+        self._notify_service(f"⏭ {name}: omitido ({', '.join(reasons)})")
         self.notify()
+
+    def _manual_check(self, name: str, source: str, program: dict | None = None) -> list[dict]:
+        """Apply custom conditions to manual/service runs; returns the re-check list."""
+        if not self.settings.get("manual_conditions", True):
+            return []
+        conditions = self.settings.get("conditions", []) + (program.get("conditions", []) if program else [])
+        reasons = self.condition_failures(conditions)
+        if reasons:
+            self._record_skip(name, program["id"] if program else None, source, reasons)
+            raise ConditionBlocked(reasons)
+        return conditions
 
     # ------------------------------------------------------------ enqueue
     def _delays(self, program: dict | None) -> tuple[int, int]:
@@ -325,7 +392,10 @@ class IrrigationEngine:
                 sd = program["step_delay_s"]
         return zd, sd
 
-    def enqueue_program(self, program: dict, source: str = SOURCE_MANUAL) -> Run | None:
+    def enqueue_program(self, program: dict, source: str = SOURCE_MANUAL,
+                        recheck: list[dict] | None = None) -> Run | None:
+        if source != SOURCE_SCHEDULE:
+            recheck = self._manual_check(program["name"], source, program)
         steps = build_program_plan(program, self.zones_by_id(), self.groups_by_id(),
                                    self.budget_percent(), self.settings["max_zone_minutes"])
         if not steps:
@@ -333,7 +403,7 @@ class IrrigationEngine:
             return None
         zd, sd = self._delays(program)
         run = Run(id=new_id("run"), name=program["name"], source=source, steps=steps,
-                  program_id=program["id"], zone_delay=zd, step_delay=sd)
+                  program_id=program["id"], zone_delay=zd, step_delay=sd, recheck=recheck or [])
         return self._enqueue(run)
 
     def enqueue_group(self, group: dict, minutes: float, concurrency: int = 1,
@@ -344,17 +414,20 @@ class IrrigationEngine:
                    if z in zones and zones[z]["enabled"] and zones[z]["entity_id"]]
         if not planned or seconds <= 0:
             return None
+        recheck = self._manual_check(group["name"], source)
         zd, sd = self._delays(None)
         run = Run(id=new_id("run"), name=group["name"], source=source,
-                  steps=[PlannedStep(group["name"], concurrency, planned)], zone_delay=zd, step_delay=sd)
+                  steps=[PlannedStep(group["name"], concurrency, planned)], zone_delay=zd, step_delay=sd,
+                  recheck=recheck)
         return self._enqueue(run)
 
     def enqueue_zone(self, zone: dict, minutes: float, source: str = SOURCE_MANUAL) -> Run | None:
         seconds = int(min(minutes, self.settings["max_zone_minutes"]) * 60)
         if seconds <= 0 or not zone.get("entity_id"):
             return None
+        recheck = self._manual_check(zone["name"], source)
         run = Run(id=new_id("run"), name=zone["name"], source=source,
-                  steps=[PlannedStep(zone["name"], 1, [PlannedZone(zone["id"], seconds)])])
+                  steps=[PlannedStep(zone["name"], 1, [PlannedZone(zone["id"], seconds)])], recheck=recheck)
         return self._enqueue(run)
 
     def _enqueue(self, run: Run) -> Run:
@@ -418,6 +491,9 @@ class IrrigationEngine:
                 status, reason = STATUS_STOPPED, "stopped"
                 await self._finish(run, status, reason)
                 raise
+            except ConditionStop as err:
+                _LOGGER.warning("Run %s stopped by condition: %s", run.name, err)
+                status, reason = STATUS_STOPPED, str(err)
             except Exception as err:  # noqa: BLE001
                 _LOGGER.exception("Run %s failed", run.name)
                 status, reason = STATUS_ERROR, str(err)
@@ -451,6 +527,37 @@ class IrrigationEngine:
         zones = self.zones_by_id()
         if any(s.zones for s in run.steps):
             await self._master(True)
+        watchdog = None
+        if any(c.get("recheck") for c in run.recheck):
+            watchdog = asyncio.ensure_future(self._watchdog(run))
+        try:
+            await self._execute_steps(run, zones, cap)
+        finally:
+            if watchdog:
+                watchdog.cancel()
+        if run.stop_reason:
+            raise ConditionStop(run.stop_reason)
+
+    def _check_recheck(self, run: Run) -> None:
+        if not run.stop_reason:
+            failures = self.condition_failures(run.recheck, recheck_only=True)
+            if failures:
+                run.stop_reason = ", ".join(failures)
+        if run.stop_reason:
+            raise ConditionStop(run.stop_reason)
+
+    async def _watchdog(self, run: Run) -> None:
+        """Stop the run as soon as a re-checked condition stops being true."""
+        while True:
+            await asyncio.sleep(WATCHDOG_INTERVAL)
+            failures = self.condition_failures(run.recheck, recheck_only=True)
+            if failures:
+                run.stop_reason = ", ".join(failures)
+                for active in run.active.values():
+                    active.skip.set()
+                return
+
+    async def _execute_steps(self, run: Run, zones: dict, cap: int) -> None:
         for index, step in enumerate(run.steps):
             run.step_index = index
             limit = resolve_concurrency(step.concurrency, len(step.zones), cap)
@@ -458,7 +565,8 @@ class IrrigationEngine:
             tasks: set[asyncio.Task] = set()
             try:
                 while pending or tasks:
-                    while pending and len(tasks) < limit:
+                    while pending and len(tasks) < limit and not run.stop_reason:
+                        self._check_recheck(run)
                         planned = pending.pop(0)
                         zone = zones.get(planned.zone_id)
                         if not zone or not zone.get("entity_id"):
@@ -469,17 +577,30 @@ class IrrigationEngine:
                         for t in done:
                             if t.exception():
                                 _LOGGER.error("Zone failed: %s", t.exception())
-            except asyncio.CancelledError:
+                    elif run.stop_reason:
+                        break
+            except BaseException:
                 for t in tasks:
                     t.cancel()
                 await asyncio.gather(*tasks, return_exceptions=True)
                 raise
+            if run.stop_reason:
+                return
             if index < len(run.steps) - 1 and run.step_delay:
                 await asyncio.sleep(run.step_delay)
 
     async def _water_zone(self, run: Run, zone: dict, seconds: int) -> None:
         entity_id = zone["entity_id"]
         now = dt_util.now()
+        st = self.hass.states.get(entity_id)
+        if st is None or st.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            _LOGGER.warning("%s is unavailable, skipping %s", entity_id, zone["name"])
+            if zone["id"] in run.pending:
+                run.pending.remove(zone["id"])
+            run.done.append({"zone_id": zone["id"], "start": now.isoformat(), "seconds": 0,
+                             "planned": seconds, "skipped": "unavailable"})
+            self.notify()
+            return
         active = ActiveZone(zone["id"], entity_id, now, now + timedelta(seconds=seconds), seconds)
         run.active[zone["id"]] = active
         if zone["id"] in run.pending:
@@ -628,8 +749,12 @@ class IrrigationEngine:
                 "pending": list(run.pending),
                 "done": run.done,
             }
+        program_blocks = {
+            p["id"]: self.condition_failures(p["conditions"]) for p in self.config["programs"] if p.get("conditions")
+        }
         return {
             "now": now.isoformat(),
+            "program_blocks": program_blocks,
             "status": self.status(),
             "current": current,
             "queue": [r.summary() for r in self.queue],
