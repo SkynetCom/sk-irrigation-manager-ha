@@ -1,8 +1,8 @@
 // SK Irrigation Manager — Home Assistant panel.
 // Dependency-free web component: renders with template strings, uses event
 // delegation, and implements pointer-based drag & drop (mouse + touch).
-import { I18N } from "./sk-irrigation-i18n.js?v=1.2.0";
-import { STYLES } from "./sk-irrigation-styles.js?v=1.2.0";
+import { I18N } from "./sk-irrigation-i18n.js?v=1.2.1";
+import { STYLES } from "./sk-irrigation-styles.js?v=1.2.1";
 
 const DOMAIN = "sk_irrigation";
 const TABS = [
@@ -90,7 +90,7 @@ class SkIrrigationPanel extends HTMLElement {
     this._dialog = null;
     this._saveTimers = {};
     this._search = "";
-    this._domain = "all";
+    this._domain = "suggested";
     this._skew = 0;
     const sr = this.shadowRoot;
     sr.addEventListener("click", (e) => this._onClick(e));
@@ -100,6 +100,9 @@ class SkIrrigationPanel extends HTMLElement {
     sr.addEventListener("pointermove", (e) => this._onPointerMove(e));
     sr.addEventListener("pointerup", (e) => this._onPointerUp(e));
     sr.addEventListener("pointercancel", () => this._cancelDrag());
+    sr.addEventListener("keydown", (e) => {
+      if (this._pk && (e.target.dataset?.bind === "pk-search" || e.key === "Escape")) this._pkKey(e);
+    });
   }
 
   // ------------------------------------------------------------ HA hooks
@@ -293,12 +296,6 @@ class SkIrrigationPanel extends HTMLElement {
     return !!st && ["on", "open", "opening"].includes(st.state);
   }
 
-  _entityOptions(domains, value, allowEmpty = true) {
-    const ids = Object.keys(this._hass.states).filter((id) => domains.includes(id.split(".")[0])).sort();
-    const opts = ids.map((id) => `<option value="${esc(id)}" ${id === value ? "selected" : ""}>${esc(this._entityName(id))} (${esc(id)})</option>`);
-    return `${allowEmpty ? `<option value="">${this.t("none")}</option>` : ""}${opts.join("")}`;
-  }
-
   // ------------------------------------------------------------ render
   _render() {
     const sr = this.shadowRoot;
@@ -323,10 +320,8 @@ class SkIrrigationPanel extends HTMLElement {
     if (newScroller) newScroller.scrollTop = scroll;
     const mb = sr.querySelector("ha-menu-button");
     if (mb) { mb.hass = this._hass; mb.narrow = this._narrow; }
-    if (this._tab === "settings" || (this._tab === "programs" && this._edit)) {
-      sr.querySelector("main").insertAdjacentHTML("beforeend", this._entityDatalist());
-      this._scheduleCondCheck();
-    }
+    if (this._tab === "settings" || (this._tab === "programs" && this._edit)) this._scheduleCondCheck();
+    if (this._pk && this._pkEl) sr.appendChild(this._pkEl);
     this._tick();
   }
 
@@ -553,6 +548,7 @@ class SkIrrigationPanel extends HTMLElement {
     const f = this._domain;
     return this._devices().filter((c) => {
       const zone = this._zoneByEntity(c.entity_id);
+      if (f === "suggested" && !this._isSuggested(c)) return false;
       if (f === "rainbird" && c.platform !== "rainbird") return false;
       if (f === "unassigned" && zone && counts[zone.id]) return false;
       if (f.startsWith("area:") && c.area !== f.slice(5)) return false;
@@ -577,7 +573,7 @@ class SkIrrigationPanel extends HTMLElement {
           <div class="small muted sub">${c.platform === "rainbird" ? `<span class="badge rb">Rain Bird</span>` : ""}
             ${c.missing ? `<span class="badge red">${this.t("missing")}</span>` : ""}
             ${z && !z.enabled ? `<span class="badge">${this.t("program_disabled")}</span>` : ""}
-            ${c.area ? `<span><ha-icon icon="mdi:home-outline" style="--mdc-icon-size:13px"></ha-icon> ${esc(c.area)}</span>` : `<span>${esc(c.entity_id)}</span>`}</div></div>
+            <span class="sub-txt">${esc([this._entityMeta(c.entity_id).device, c.area].filter(Boolean).join(" · ") || c.entity_id)}</span></div></div>
         ${n ? `<span class="badge green" title="${this.t("in_groups", { n })}">${n}</span>` : ""}
         ${can ? `<button class="btn icon" title="${this.t("edit_sprinkler")}" data-action="edit-dev" data-id="${esc(c.entity_id)}"><ha-icon icon="mdi:pencil-outline" style="--mdc-icon-size:18px"></ha-icon></button>` : ""}
       </div>`;
@@ -588,17 +584,19 @@ class SkIrrigationPanel extends HTMLElement {
     const can = this._can();
     const devices = this._devices();
     const areas = [...new Set(devices.map((d) => d.area).filter(Boolean))].sort();
-    const filters = [["all", this.t("all_domains")], ["unassigned", this.t("unassigned")]];
+    const filters = [["suggested", this.t("suggested")], ["all", this.t("all_domains")], ["unassigned", this.t("unassigned")]];
     if (devices.some((d) => d.platform === "rainbird")) filters.push(["rainbird", "Rain Bird"]);
-    areas.forEach((a) => filters.push([`area:${a}`, a]));
+    const areaSel = this._domain.startsWith("area:") ? this._domain.slice(5) : null;
+    const shown = this._filteredDevices().length;
     return `<p class="hint">${this.t("groups_hint")}</p>
     <div class="groups-layout">
       <div class="card pool"><div class="hd"><h2><ha-icon icon="mdi:sprinkler"></ha-icon>${this.t("sprinklers_pool")}</h2>
         <span class="badge">${devices.length}</span></div>
         <div class="bd">
           <input type="text" placeholder="${this.t("search")}" value="${esc(this._search)}" data-bind="search">
-          <div class="chips" style="margin:10px 0">${filters.map(([k, label]) => `<button class="chip ${this._domain === k ? "on" : ""}" data-action="domain" data-id="${esc(k)}">
-            ${k.startsWith("area:") ? `<ha-icon icon="mdi:home-outline" style="--mdc-icon-size:14px"></ha-icon>` : ""}${esc(label)}</button>`).join("")}</div>
+          <div class="chips" style="margin:10px 0">${filters.map(([k, label]) => `<button class="chip ${this._domain === k ? "on" : ""}" data-action="domain" data-id="${esc(k)}">${esc(label)}</button>`).join("")}
+            ${areas.length ? `<button class="chip ${areaSel ? "on" : ""}" data-action="pick" data-pick="area-filter"><ha-icon icon="mdi:home-outline" style="--mdc-icon-size:14px"></ha-icon>${esc(areaSel || this.t("area"))}<ha-icon icon="mdi:menu-down" style="--mdc-icon-size:16px"></ha-icon></button>` : ""}</div>
+          <div class="small muted" style="margin:-4px 0 8px">${this.t("showing_n", { n: shown, total: devices.length })}</div>
           ${can && areas.length ? `<button class="btn" style="width:100%;justify-content:center;margin-bottom:10px" data-action="groups-from-areas">
             <ha-icon icon="mdi:home-group-plus"></ha-icon>${this.t("from_areas")}</button>` : ""}
           <div class="dropzone" id="pool-list" data-drop="pool" data-accept="zone">${this._poolItemsHtml()}</div>
@@ -633,8 +631,8 @@ class SkIrrigationPanel extends HTMLElement {
               ${can ? `<button class="btn icon" data-action="ungroup" data-group="${g.id}" data-id="${zid}"><ha-icon icon="mdi:close" style="--mdc-icon-size:16px"></ha-icon></button>` : ""}</div>`;
           }).join("") : this.t("drop_here")}
         </div>
-        ${can && free.length ? `<select style="margin-top:8px" data-bind="group-add:${g.id}"><option value="">＋ ${this.t("add_zone_to_group")}</option>
-          ${free.map((d) => `<option value="${esc(d.entity_id)}">${esc(this._zoneByEntity(d.entity_id)?.name || d.name)}${d.area ? ` (${esc(d.area)})` : ""}</option>`).join("")}</select>` : ""}
+        ${can && free.length ? `<button class="btn sm add-zone" data-action="pick" data-pick="group-add:${g.id}">
+          <ha-icon icon="mdi:plus"></ha-icon>${this.t("add_zone_to_group")}</button>` : ""}
         <div class="small muted" style="margin-top:8px">${g.zone_ids.length} ${this.t("zones_lc")}</div>
       </div></div>`;
   }
@@ -915,11 +913,6 @@ class SkIrrigationPanel extends HTMLElement {
       : `<span class="badge amber"><ha-icon icon="mdi:close" style="--mdc-icon-size:14px"></ha-icon>${this.t("cond_fail")}</span>${detail}`;
   }
 
-  _entityDatalist() {
-    return `<datalist id="ski-entities">${Object.keys(this._hass.states).sort()
-      .map((id) => `<option value="${esc(id)}">${esc(this._entityName(id))}</option>`).join("")}</datalist>`;
-  }
-
   _condEditorHtml(scope) {
     const list = this._condList(scope);
     const res = this._condResults || {};
@@ -934,7 +927,8 @@ class SkIrrigationPanel extends HTMLElement {
             <div class="small muted">${this.t("cond_template_hint")}</div>`;
         } else {
           const entity = `<label class="field" style="flex:2;min-width:220px"><span>${this.t("cond_entity")}</span>
-            <input type="text" list="ski-entities" value="${esc(c.entity_id || "")}" data-bind="${b}:entity_id" placeholder="sensor.…" spellcheck="false"></label>`;
+            <div class="pk-field"><input type="text" value="${esc(c.entity_id || "")}" data-bind="${b}:entity_id" placeholder="sensor.…" spellcheck="false">
+            <button type="button" class="btn icon" title="${this.t("search")}" data-action="pick" data-pick="cond:${scope}:${i}" data-domains="" data-title="${this.t("cond_entity")}"><ha-icon icon="mdi:magnify"></ha-icon></button></div></label>`;
           const attrib = `<label class="field" style="flex:1;min-width:120px"><span>${this.t("cond_attribute")}</span>
             <input type="text" value="${esc(c.attribute || "")}" data-bind="${b}:attribute" spellcheck="false"></label>`;
           body = c.type === "numeric"
@@ -990,16 +984,218 @@ class SkIrrigationPanel extends HTMLElement {
     } catch (err) { /* ignore */ }
   }
 
+  // ------------------------------------------------------------ entity picker
+  // Searchable popover that replaces native <select>s: grouped by HA area,
+  // shows device + entity_id to tell identical names apart, keyboard friendly,
+  // optional multi-select. Lives outside the main template so typing in its
+  // search box never triggers a full re-render.
+  _entityMeta(id) {
+    const ent = this._hass.entities?.[id];
+    const dev = ent?.device_id ? this._hass.devices?.[ent.device_id] : null;
+    const areaId = ent?.area_id || dev?.area_id;
+    return {
+      area: (areaId && this._hass.areas?.[areaId]?.name) || null,
+      device: dev ? dev.name_by_user || dev.name : null,
+      platform: ent?.platform || null,
+    };
+  }
+
+  _entityItems(domains) {
+    return Object.keys(this._hass.states)
+      .filter((id) => (!domains.length || domains.includes(id.split(".")[0])) && this._hass.entities?.[id]?.platform !== DOMAIN)
+      .map((id) => {
+        const m = this._entityMeta(id);
+        return { id, name: this._entityName(id), sub: [m.device, id].filter(Boolean).join(" · "), group: m.area,
+          icon: this._hass.states[id].attributes.icon, rb: m.platform === "rainbird" };
+      });
+  }
+
+  _isSuggested(c) {
+    return c.platform === "rainbird" || c.domain === "valve" ||
+      /sprink|riego|regad|aspers|irrig|valv|goteo|drip|rain ?bird|opensprinkler/i.test(`${c.name} ${c.entity_id}`);
+  }
+
+  _pickerSpec(target) {
+    const [kind, a] = target.split(":");
+    if (kind === "group-add") {
+      const g = this._group(a);
+      const inGroup = new Set(g.zone_ids.map((z) => this._zone(z)?.entity_id));
+      const items = this._devices().filter((d) => !inGroup.has(d.entity_id)).map((d) => {
+        const z = this._zoneByEntity(d.entity_id);
+        const m = this._entityMeta(d.entity_id);
+        return { id: d.entity_id, name: z?.name || d.name, sub: [m.device, d.entity_id].filter(Boolean).join(" · "),
+          group: d.area || m.area, rb: d.platform === "rainbird", suggested: this._isSuggested(d), color: z?.color };
+      });
+      return { title: `${this.t("add_zone_to_group")} — ${g.name}`, multi: true, items,
+        chips: [["suggested", this.t("suggested")], ["all", this.t("all_domains")], ["rainbird", "Rain Bird"]],
+        chip: items.some((i) => i.suggested) ? "suggested" : "all" };
+    }
+    if (kind === "rain-add") {
+      return { title: this.t("rain_sensors"), multi: true,
+        items: this._entityItems(["binary_sensor", "input_boolean", "sensor"]).filter((i) => !this._config.settings.rain_sensors.includes(i.id)) };
+    }
+    if (kind === "notify") {
+      return { title: this.t("notify_service"), items: Object.keys(this._hass.services?.notify || {})
+        .map((n) => ({ id: `notify.${n}`, name: n.replace(/_/g, " "), sub: `notify.${n}`, icon: "mdi:bell-outline" })) };
+    }
+    if (kind === "area-filter") {
+      const areas = [...new Set(this._devices().map((d) => d.area).filter(Boolean))].sort();
+      return { title: this.t("area"), items: areas.map((n) => ({ id: n, name: n, icon: "mdi:home-outline",
+        sub: `${this._devices().filter((d) => d.area === n).length} ${this.t("devices_lc")}` })) };
+    }
+    const domains = (this._pkDomains || "").split(",").filter(Boolean);
+    return { title: this._pkTitle || this.t("cond_entity"), items: this._entityItems(domains) };
+  }
+
+  _openPicker(target, anchor) {
+    this._pkDomains = anchor.dataset.domains || "";
+    this._pkTitle = anchor.dataset.title || "";
+    const spec = this._pickerSpec(target);
+    anchor.scrollIntoView({ block: "nearest" });
+    const r = anchor.getBoundingClientRect();
+    this._pk = { target, ...spec, query: "", sel: new Set(), idx: 0, rect: r, chip: spec.chip || "all" };
+    this._renderPicker();
+    setTimeout(() => this.shadowRoot.querySelector(".pk input")?.focus(), 30);
+  }
+
+  _closePicker() {
+    this._pk = null;
+    this._pkEl?.remove();
+  }
+
+  _pkFiltered() {
+    const p = this._pk;
+    const tokens = p.query.toLowerCase().split(/\s+/).filter(Boolean);
+    return p.items.filter((i) => {
+      if (p.chip === "suggested" && !i.suggested) return false;
+      if (p.chip === "rainbird" && !i.rb) return false;
+      const hay = `${i.name} ${i.sub || ""} ${i.group || ""}`.toLowerCase();
+      return tokens.every((t) => hay.includes(t));
+    }).sort((x, y) => (x.group || "~").localeCompare(y.group || "~") || x.name.localeCompare(y.name, undefined, { numeric: true }));
+  }
+
+  _pkListHtml() {
+    const p = this._pk;
+    const list = this._pkFiltered();
+    p.flat = list.slice(0, 400);
+    if (!list.length) return `<div class="empty small">${this.t("no_results")}</div>`;
+    let last;
+    return p.flat.map((i, n) => {
+      const head = i.group !== last ? `<div class="pk-group">${i.group ? `<ha-icon icon="mdi:home-outline"></ha-icon>${esc(i.group)}` : this.t("no_area")}</div>` : "";
+      last = i.group;
+      const on = p.sel.has(i.id);
+      return `${head}<div class="pk-item ${n === p.idx ? "hl" : ""} ${on ? "on" : ""}" data-action="pk-pick" data-id="${esc(i.id)}" data-n="${n}">
+        ${p.multi ? `<span class="pk-check"><ha-icon icon="${on ? "mdi:checkbox-marked" : "mdi:checkbox-blank-outline"}"></ha-icon></span>`
+          : i.color ? `<span class="swatch" style="background:${esc(i.color)}"></span>` : `<ha-icon class="pk-ic" icon="${esc(i.icon || "mdi:checkbox-blank-circle-outline")}"></ha-icon>`}
+        <div class="pk-txt"><div class="pk-nm">${esc(i.name)}</div>${i.sub ? `<div class="pk-sub">${esc(i.sub)}</div>` : ""}</div>
+        ${i.rb ? `<span class="badge rb">Rain Bird</span>` : ""}
+      </div>`;
+    }).join("") + (list.length > p.flat.length ? `<div class="empty small">${this.t("refine_search", { n: list.length })}</div>` : "");
+  }
+
+  _renderPicker() {
+    const p = this._pk;
+    if (!p) return;
+    if (!this._pkEl) { this._pkEl = document.createElement("div"); this._pkEl.className = "pk-root"; }
+    const narrow = window.innerWidth < 640;
+    const w = Math.min(460, window.innerWidth - 24);
+    const vh = window.innerHeight;
+    const below = vh - p.rect.bottom > 360 || p.rect.top < 360;
+    const left = Math.max(12, Math.min(p.rect.left, window.innerWidth - w - 12));
+    const top = Math.max(12, Math.min(p.rect.bottom + 6, vh - 372));
+    const bottom = Math.max(12, Math.min(vh - p.rect.top + 6, vh - 372));
+    const pos = narrow ? "left:8px;right:8px;bottom:8px;max-height:78vh"
+      : `left:${left}px;width:${w}px;${below ? `top:${top}px` : `bottom:${bottom}px`}`;
+    this._pkEl.innerHTML = `<div class="pk-scrim ${narrow ? "dim" : ""}" data-action="pk-close"></div>
+      <div class="pk" style="${pos}" role="dialog">
+        <div class="pk-title">${esc(p.title)}<span class="spacer"></span><button class="btn icon" data-action="pk-close"><ha-icon icon="mdi:close"></ha-icon></button></div>
+        <div class="pk-search"><ha-icon icon="mdi:magnify"></ha-icon><input type="text" data-bind="pk-search" placeholder="${this.t("search_hint")}" value="${esc(p.query)}" autocomplete="off" spellcheck="false"></div>
+        ${p.chips ? `<div class="chips pk-chips">${p.chips.map(([k, l]) => `<button class="chip ${p.chip === k ? "on" : ""}" data-action="pk-chip" data-id="${k}">${esc(l)}</button>`).join("")}</div>` : ""}
+        <div class="pk-list" id="pk-list">${this._pkListHtml()}</div>
+        ${p.multi ? `<div class="pk-ft"><span class="muted small" id="pk-count">${this.t("selected_n", { n: p.sel.size })}</span><span class="spacer"></span>
+          <button class="btn" data-action="pk-close">${this.t("cancel")}</button>
+          <button class="btn primary" data-action="pk-done" ${p.sel.size ? "" : "disabled"}><ha-icon icon="mdi:plus"></ha-icon>${this.t("add")}</button></div>` : ""}
+      </div>`;
+    if (!this._pkEl.isConnected) this.shadowRoot.appendChild(this._pkEl);
+  }
+
+  _refreshPickerList(keepScroll = true) {
+    const list = this.shadowRoot.getElementById("pk-list");
+    if (!list) return;
+    const top = list.scrollTop;
+    list.innerHTML = this._pkListHtml();
+    if (keepScroll) list.scrollTop = top;
+    const count = this.shadowRoot.getElementById("pk-count");
+    if (count) count.textContent = this.t("selected_n", { n: this._pk.sel.size });
+    const done = this.shadowRoot.querySelector("[data-action=pk-done]");
+    if (done) done.disabled = !this._pk.sel.size;
+  }
+
+  _pkKey(e) {
+    const p = this._pk;
+    if (!p) return;
+    if (e.key === "Escape") { this._closePicker(); return; }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      p.idx = Math.max(0, Math.min((p.flat?.length || 1) - 1, p.idx + (e.key === "ArrowDown" ? 1 : -1)));
+      this._refreshPickerList();
+      this.shadowRoot.querySelector(".pk-item.hl")?.scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const item = p.flat?.[p.idx];
+      if (item) this._pkSelect(item.id);
+      else if (p.multi && p.sel.size) this._pkApply([...p.sel]);
+    }
+  }
+
+  _pkSelect(id) {
+    const p = this._pk;
+    if (!p.multi) { this._pkApply([id]); return; }
+    if (p.sel.has(id)) p.sel.delete(id); else p.sel.add(id);
+    this._refreshPickerList();
+  }
+
+  _pkApply(values) {
+    const target = this._pk.target;
+    this._closePicker();
+    const [kind, a, b] = target.split(":");
+    const s = this._config.settings;
+    if (kind === "settings") { s[a] = values[0] ?? null; this._queueSave("settings"); }
+    else if (kind === "notify") { s.notify_service = values[0] ?? null; this._queueSave("settings"); }
+    else if (kind === "rain-add") { values.forEach((v) => { if (!s.rain_sensors.includes(v)) s.rain_sensors.push(v); }); this._queueSave("settings"); }
+    else if (kind === "group-add") {
+      const g = this._group(a);
+      values.forEach((e) => { const z = this._ensureZone(e); if (!g.zone_ids.includes(z.id)) g.zone_ids.push(z.id); });
+      this._queueSave("layout");
+      this._toast(this.t("added_n", { n: values.length }));
+    } else if (kind === "area-filter") { this._domain = values[0] ? `area:${values[0]}` : "suggested"; }
+    else if (kind === "cond") {
+      this._condList(a)[Number(b)].entity_id = values[0] ?? null;
+      if (a === "settings") this._queueSave("settings"); else this._dirty = true;
+    }
+    this._render();
+  }
+
+  _pickField(target, value, label, domains, placeholder) {
+    const can = this._can();
+    const name = value ? (target === "notify" ? value.replace(/^notify\./, "").replace(/_/g, " ") : this._entityName(value)) : "";
+    return `<label class="field"><span>${label}</span><div class="pk-field">
+      <button type="button" class="pk-btn ${value ? "" : "is-empty"}" data-action="pick" data-pick="${target}" data-domains="${domains}" data-title="${esc(label)}" ${can ? "" : "disabled"}>
+        <span class="pk-btn-txt">${value ? `<b>${esc(name)}</b><small>${esc(value)}</small>` : esc(placeholder || this.t("choose"))}</span>
+        <ha-icon icon="mdi:menu-down"></ha-icon></button>
+      ${value && can ? `<button type="button" class="btn icon" title="${this.t("clear")}" data-action="pk-clear" data-pick="${target}"><ha-icon icon="mdi:close"></ha-icon></button>` : ""}
+    </div></label>`;
+  }
+
   // ------------------------------------------------------------ settings tab
   _render_settings() {
     const s = this._config.settings;
     const can = this._can() ? "" : "disabled";
     const num = (key, label, min = 0, max = 9999, step = 1) => `<label class="field"><span>${label}</span>
       <input type="number" min="${min}" max="${max}" step="${step}" value="${s[key] ?? ""}" data-bind="settings:${key}" ${can}></label>`;
-    const ent = (key, label, domains) => `<label class="field"><span>${label}</span>
-      <select data-bind="settings:${key}" ${can}>${this._entityOptions(domains, s[key])}</select></label>`;
+    const ent = (key, label, domains) => this._pickField(`settings:${key}`, s[key], label, domains.join(","), this.t("none"));
     const notify = Object.keys(this._hass.services?.notify || {}).map((n) => `notify.${n}`);
-    return `<div class="grid cols-2">
+    return `<div class="grid settings-grid">
       <div class="card"><div class="hd"><h2><ha-icon icon="mdi:tune"></ha-icon>${this.t("s_general")}</h2></div><div class="bd">
         <div class="toggle-row"><span class="lbl">${this.t("system_enabled")}</span>
           <label class="switch"><input type="checkbox" data-bind="settings:enabled" ${s.enabled ? "checked" : ""} ${can}><span class="tr"></span></label></div>
@@ -1015,7 +1211,7 @@ class SkIrrigationPanel extends HTMLElement {
         <label class="field"><span>${this.t("rain_sensors")}</span></label>
         <div class="chips" style="margin:6px 0 8px">${s.rain_sensors.map((e) => `<span class="chip">${esc(this._entityName(e))}
           ${this._can() ? `<button class="btn icon" style="padding:0" data-action="del-rain" data-id="${esc(e)}"><ha-icon icon="mdi:close" style="--mdc-icon-size:14px"></ha-icon></button>` : ""}</span>`).join("")}</div>
-        ${this._can() ? `<select data-bind="rain-add">${this._entityOptions(["binary_sensor", "input_boolean", "sensor"], null)}</select>` : ""}
+        ${this._can() ? `<button class="btn sm" data-action="pick" data-pick="rain-add"><ha-icon icon="mdi:plus"></ha-icon>${this.t("add_sensor")}</button>` : ""}
         <div class="fields" style="margin-top:14px">
           ${ent("weather_entity", this.t("weather_entity"), ["weather"])}
           ${ent("freeze_sensor", this.t("freeze_sensor"), ["sensor", "input_number"])}
@@ -1037,8 +1233,7 @@ class SkIrrigationPanel extends HTMLElement {
         ${num("max_concurrent", this.t("max_concurrent"), 0, 64)}
       </div></div></div>
       <div class="card"><div class="hd"><h2><ha-icon icon="mdi:bell-outline"></ha-icon>${this.t("s_notifications")} & ${this.t("s_backup")}</h2></div><div class="bd">
-        <label class="field"><span>${this.t("notify_service")}</span><select data-bind="settings:notify_service" ${can}>
-          <option value="">${this.t("none")}</option>${notify.map((n) => `<option ${n === s.notify_service ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+        ${this._pickField("notify", s.notify_service, this.t("notify_service"), "", this.t("none"))}
         <div class="row wrap" style="margin-top:16px">
           <button class="btn" data-action="export"><ha-icon icon="mdi:download"></ha-icon>${this.t("export")}</button>
           ${this._can() ? `<label class="btn"><ha-icon icon="mdi:upload"></ha-icon>${this.t("import")}<input type="file" accept="application/json" data-bind="import" hidden></label>` : ""}
@@ -1125,6 +1320,12 @@ class SkIrrigationPanel extends HTMLElement {
     const n = el.dataset.n !== undefined ? Number(el.dataset.n) : null;
     const p = this._edit;
     switch (a) {
+      case "pick": this._openPicker(el.dataset.pick, el); return;
+      case "pk-close": this._closePicker(); return;
+      case "pk-pick": this._pk.idx = n; this._pkSelect(id); return;
+      case "pk-done": this._pkApply([...this._pk.sel]); return;
+      case "pk-chip": this._pk.chip = id; this._pk.idx = 0; this._renderPicker(); return;
+      case "pk-clear": this._pk = { target: el.dataset.pick }; this._pkApply([]); return;
       case "tab":
         if (this._edit && this._dirty && id !== "programs") { /* keep draft */ }
         this._tab = id;
@@ -1357,6 +1558,12 @@ class SkIrrigationPanel extends HTMLElement {
 
   _onInput(e) {
     const el = e.target;
+    if (el.dataset.bind === "pk-search" && this._pk) {
+      this._pk.query = el.value;
+      this._pk.idx = 0;
+      this._refreshPickerList(false);
+      return;
+    }
     if (el.dataset.bind === "search") {
       this._search = el.value;
       const list = this.shadowRoot.getElementById("pool-list");
@@ -1367,7 +1574,7 @@ class SkIrrigationPanel extends HTMLElement {
   async _onChange(e) {
     const el = e.target;
     const bind = el.dataset.bind;
-    if (!bind || bind === "search") return;
+    if (!bind || bind === "search" || bind === "pk-search") return;
     const [scope, a, b] = bind.split(":");
     let v;
     if (el.type === "checkbox") v = el.checked;

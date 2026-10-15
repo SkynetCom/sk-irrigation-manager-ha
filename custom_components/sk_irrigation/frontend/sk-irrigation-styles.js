@@ -36,7 +36,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .tab ha-icon { --mdc-icon-size: 18px; }
 .tab.active { opacity: 1; border-bottom-color: currentColor; }
 .tab:hover { opacity: 1; }
-main { max-width: 1320px; margin: 0 auto; padding: 20px 16px 120px; font-size: 14px; }
+main { max-width: 1600px; margin: 0 auto; padding: 20px 16px 120px; font-size: 14px; }
 .grid { display: grid; gap: 16px; }
 .cols-2 { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
 .cols-main { grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); }
@@ -235,6 +235,46 @@ label.field > span { padding-left: 2px; }
 .kpi { border: 1px solid var(--ski-line); border-radius: 12px; padding: 10px; text-align: center; }
 .kpi b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
 .kpi span { font-size: 12px; color: var(--ski-muted); }
+
+/* settings grid: two equal columns, full-width cards span both */
+.settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+@media (max-width: 900px) { .settings-grid { grid-template-columns: 1fr; } }
+
+/* entity picker */
+.pk-field { display: flex; gap: 6px; align-items: center; }
+.pk-field > input { flex: 1; }
+.pk-btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; text-align: left; min-height: 38px; padding: 6px 10px;
+  border: 1px solid var(--ski-line); border-radius: 9px; background: var(--input-fill-color, rgba(127,127,127,.06)); cursor: pointer; }
+.pk-btn:hover { border-color: var(--ski-primary); }
+.pk-btn.is-empty { color: var(--ski-muted); }
+.pk-btn-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.pk-btn-txt b, .pk-btn-txt small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pk-btn-txt b { font-weight: 500; font-size: 14px; }
+.pk-btn-txt small { color: var(--ski-muted); font-size: 11.5px; }
+.add-zone { margin-top: 10px; width: 100%; justify-content: center; border-style: dashed; }
+.pk-scrim { position: fixed; inset: 0; z-index: 960; }
+.pk-scrim.dim { background: rgba(0,0,0,.35); }
+.pk { position: fixed; z-index: 970; max-height: min(520px, 72vh); display: flex; flex-direction: column; background: var(--ski-card);
+  border: 1px solid var(--ski-line); border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.28); overflow: hidden; animation: fade .12s; }
+.pk-title { display: flex; align-items: center; padding: 10px 8px 0 14px; font-weight: 600; font-size: 14px; }
+.pk-search { display: flex; align-items: center; gap: 8px; margin: 8px 12px; padding: 0 10px; border: 1px solid var(--ski-line); border-radius: 10px; background: var(--input-fill-color, rgba(127,127,127,.06)); }
+.pk-search:focus-within { border-color: var(--ski-primary); }
+.pk-search ha-icon { color: var(--ski-muted); --mdc-icon-size: 20px; }
+.pk-search input { border: 0; background: transparent; box-shadow: none !important; padding: 8px 0; }
+.pk-chips { padding: 0 12px 6px; }
+.pk-list { overflow: auto; flex: 1; padding: 0 6px 8px; overscroll-behavior: contain; }
+.pk-group { position: sticky; top: 0; z-index: 1; display: flex; gap: 6px; align-items: center; padding: 8px 8px 4px; font-size: 11.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px; color: var(--ski-muted); background: var(--ski-card); --mdc-icon-size: 14px; }
+.pk-item { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 9px; cursor: pointer; }
+.pk-item:hover, .pk-item.hl { background: color-mix(in srgb, var(--ski-primary) 9%, transparent); }
+.pk-item.on { background: color-mix(in srgb, var(--ski-primary) 14%, transparent); }
+.pk-check { color: var(--ski-primary); --mdc-icon-size: 20px; display: inline-flex; }
+.pk-ic { color: var(--ski-muted); --mdc-icon-size: 20px; }
+.pk-txt { flex: 1; min-width: 0; }
+.pk-nm { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pk-sub { font-size: 11.5px; color: var(--ski-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pk-ft { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--ski-line); }
+.zchip.dev .sub-txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
 /* conditions */
 .cond-card { border: 1px solid var(--ski-line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: rgba(127,127,127,.03); }

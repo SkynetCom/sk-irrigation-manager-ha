@@ -20,6 +20,7 @@ from homeassistant.helpers.template import Template, result_as_boolean
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    DOMAIN,
     COND_TEMPLATE,
     RAINBIRD_PLATFORM,
     SIGNAL_PROGRAMS_CHANGED,
@@ -709,6 +710,8 @@ class IrrigationEngine:
         out = []
         for state in self.hass.states.async_all(SUPPORTED_DOMAINS):
             entry = reg.async_get(state.entity_id)
+            if entry and entry.platform == DOMAIN:
+                continue  # our own program/system switches are not sprinklers
             area_id = entry.area_id if entry else None
             if entry and not area_id and entry.device_id:
                 device = devices.async_get(entry.device_id)

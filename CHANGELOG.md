@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.1 — 2026-10-15
+- **Selector de entidades propio** que reemplaza los desplegables nativos: buscador por nombre, área,
+  controlador o entity_id; agrupado por área de HA; navegación con teclado; selección múltiple
+  ("Agregar aspersor" permite sumar varios a la vez); hoja inferior en celulares.
+- Aplica a "Agregar aspersor", sensores de lluvia, clima, temperatura, presupuesto, válvula maestra,
+  notificaciones y a las entidades de las condiciones.
+- Lista de aspersores: filtro **Sugeridos** por defecto (Rain Bird, válvulas y nombres de riego), filtro de
+  área compacto, contador "mostrando N de M" y nombre del controlador para distinguir zonas homónimas.
+- Se excluyen los switches propios del módulo de las listas de dispositivos.
+- Ajustes: grilla de 2 columnas sin huecos en pantallas anchas; ancho máximo del panel ampliado.
+- Corregido: el selector vacío se veía más alto que los demás; los avisos (toast) desaparecían al refrescar.
+
 ## 1.2.0 — 2026-10-15
 - **Condiciones personalizadas** sin YAML: de estado (es / no es), numéricas (mayor/menor que, también sobre
   atributos) y plantillas Jinja. Globales (Ajustes) y por programa; indicador en vivo ✓/✗ con el valor actual.
