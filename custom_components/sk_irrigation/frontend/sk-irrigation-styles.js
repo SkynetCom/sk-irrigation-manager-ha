@@ -276,6 +276,23 @@ label.field > span { padding-left: 2px; }
 .pk-ft { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--ski-line); }
 .zchip.dev .sub-txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
+.rain-row { display: flex; align-items: center; gap: 10px; padding: 8px 6px 8px 12px; border: 1px solid var(--ski-line); border-radius: 10px; }
+.warn-line { color: var(--ski-red); margin: -2px 0 4px 4px; }
+.chip.now { box-shadow: 0 0 0 2px var(--ski-amber); }
+.pk-state { font-size: 12px; color: var(--ski-muted); white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.pk.inline { max-height: 320px; padding-top: 6px; }
+.ent-hint { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ski-muted); margin-top: -4px; --mdc-icon-size: 15px; }
+.ent-hint b { color: var(--ski-text); font-weight: 600; }
+.ent-hint.bad { color: var(--ski-red); }
+.val-sugg { gap: 6px; }
+.val-sugg .chip { padding: 3px 10px; font-size: 12.5px; }
+
+.donate { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; padding: 12px; border-radius: 12px;
+  background: color-mix(in srgb, #ffdd00 14%, transparent); border: 1px solid color-mix(in srgb, #ffbf00 40%, transparent); }
+.donate > div { flex: 1; min-width: 180px; }
+.donate-btn { background: #ffdd00; border-color: #e6c200; color: #222; text-decoration: none; font-weight: 600; }
+.donate-btn:hover { background: #ffe433; }
+
 /* conditions */
 .cond-card { border: 1px solid var(--ski-line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: rgba(127,127,127,.03); }
 .cond-card .cond-label { flex: 1; min-width: 160px; font-weight: 600; }

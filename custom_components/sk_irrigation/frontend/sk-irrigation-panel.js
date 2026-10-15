@@ -1,8 +1,8 @@
 // SK Irrigation Manager — Home Assistant panel.
 // Dependency-free web component: renders with template strings, uses event
 // delegation, and implements pointer-based drag & drop (mouse + touch).
-import { I18N } from "./sk-irrigation-i18n.js?v=1.2.2";
-import { STYLES } from "./sk-irrigation-styles.js?v=1.2.2";
+import { I18N } from "./sk-irrigation-i18n.js?v=1.3.0";
+import { STYLES } from "./sk-irrigation-styles.js?v=1.3.0";
 
 const DOMAIN = "sk_irrigation";
 const TABS = [
@@ -101,7 +101,24 @@ class SkIrrigationPanel extends HTMLElement {
     sr.addEventListener("pointerup", (e) => this._onPointerUp(e));
     sr.addEventListener("pointercancel", () => this._cancelDrag());
     sr.addEventListener("keydown", (e) => {
-      if (this._pk && (e.target.dataset?.bind === "pk-search" || e.key === "Escape")) this._pkKey(e);
+      if (this._pk && (e.target.dataset?.bind === "pk-search" || e.target.dataset?.suggest || e.key === "Escape")) this._pkKey(e);
+    });
+    // Autocomplete: entity inputs with data-suggest open an inline suggestion list.
+    sr.addEventListener("focusin", (e) => {
+      const el = e.target;
+      if (el.dataset?.suggest && this._can()) this._openPicker(el.dataset.suggest, el, true);
+    });
+    sr.addEventListener("focusout", (e) => {
+      const el = e.target;
+      const target = el.dataset?.suggest;
+      if (!target) return;
+      setTimeout(() => {
+        // only close this field's own list (focus may have moved to another entity field)
+        if (this._pk?.inline && this._pk.target === target && this.shadowRoot.activeElement !== el) this._closePicker();
+      }, 150);
+    });
+    sr.addEventListener("mousedown", (e) => {
+      if (e.target.closest?.(".pk") && !e.target.closest("input")) e.preventDefault();
     });
   }
 
@@ -913,6 +930,19 @@ class SkIrrigationPanel extends HTMLElement {
       : `<span class="badge amber"><ha-icon icon="mdi:close" style="--mdc-icon-size:14px"></ha-icon>${this.t("cond_fail")}</span>${detail}`;
   }
 
+  _valueSuggestions(c) {
+    const st = c.entity_id && this._hass.states[c.entity_id];
+    if (!st) return [];
+    const domain = c.entity_id.split(".")[0];
+    let vals = [];
+    if (Array.isArray(st.attributes.options)) vals = st.attributes.options.map(String);
+    else if (["binary_sensor", "input_boolean", "switch", "light", "fan"].includes(domain)) vals = ["on", "off"];
+    else if (domain === "weather") vals = ["sunny", "clear-night", "partlycloudy", "cloudy", "fog", "rainy", "pouring", "lightning-rainy", "snowy", "windy"];
+    if (!vals.includes(st.state) && !["unavailable", "unknown"].includes(st.state)) vals.unshift(st.state);
+    (c.states || []).forEach((v) => { if (!vals.includes(v)) vals.push(v); });
+    return vals.slice(0, 24);
+  }
+
   _condEditorHtml(scope) {
     const list = this._condList(scope);
     const res = this._condResults || {};
@@ -927,20 +957,28 @@ class SkIrrigationPanel extends HTMLElement {
             <div class="small muted">${this.t("cond_template_hint")}</div>`;
         } else {
           const entity = `<label class="field" style="flex:2;min-width:220px"><span>${this.t("cond_entity")}</span>
-            <div class="pk-field"><input type="text" value="${esc(c.entity_id || "")}" data-bind="${b}:entity_id" placeholder="sensor.…" spellcheck="false">
+            <div class="pk-field"><input type="text" value="${esc(c.entity_id || "")}" data-bind="${b}:entity_id" data-suggest="cond:${scope}:${i}"
+              placeholder="${this.t("type_to_search")}" spellcheck="false" autocomplete="off">
             <button type="button" class="btn icon" title="${this.t("search")}" data-action="pick" data-pick="cond:${scope}:${i}" data-domains="" data-title="${this.t("cond_entity")}"><ha-icon icon="mdi:magnify"></ha-icon></button></div></label>`;
+          const known = c.entity_id && this._hass.states[c.entity_id];
+          const entHint = c.entity_id ? `<div class="ent-hint ${known ? "" : "bad"}">${known
+            ? `<ha-icon icon="mdi:link-variant"></ha-icon>${esc(this._entityName(c.entity_id))} · <b>${esc(this._stateText(c.entity_id))}</b>`
+            : `<ha-icon icon="mdi:alert-outline"></ha-icon>${this.t("entity_not_found")}`}</div>` : "";
+          const vals = c.type === "state" ? this._valueSuggestions(c) : [];
+          const valChips = vals.length ? `<div class="row wrap val-sugg"><span class="small muted">${this.t("possible_values")}</span>
+            ${vals.map((v) => `<button type="button" class="chip ${(c.states || []).includes(v) ? "on" : ""}" data-action="cond-val" data-scope="${scope}" data-n="${i}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>` : "";
           const attrib = `<label class="field" style="flex:1;min-width:120px"><span>${this.t("cond_attribute")}</span>
             <input type="text" value="${esc(c.attribute || "")}" data-bind="${b}:attribute" spellcheck="false"></label>`;
           body = c.type === "numeric"
             ? `<div class="row wrap" style="align-items:flex-end">${entity}${attrib}
                 <label class="field"><span>${this.t("cond_above")}</span><input type="number" step="any" value="${c.above ?? ""}" data-bind="${b}:above"></label>
-                <label class="field"><span>${this.t("cond_below")}</span><input type="number" step="any" value="${c.below ?? ""}" data-bind="${b}:below"></label></div>`
+                <label class="field"><span>${this.t("cond_below")}</span><input type="number" step="any" value="${c.below ?? ""}" data-bind="${b}:below"></label></div>${entHint}`
             : `<div class="row wrap" style="align-items:flex-end">${entity}${attrib}
                 <label class="field"><span>&nbsp;</span><select data-bind="${b}:operator">
                   <option value="is" ${c.operator !== "not" ? "selected" : ""}>${this.t("op_is")}</option>
                   <option value="not" ${c.operator === "not" ? "selected" : ""}>${this.t("op_not")}</option></select></label>
                 <label class="field" style="flex:1;min-width:160px"><span>${this.t("cond_states")}</span>
-                  <input type="text" value="${esc((c.states || []).join(", "))}" data-bind="${b}:states" placeholder="no_rain"></label></div>`;
+                  <input type="text" value="${esc((c.states || []).join(", "))}" data-bind="${b}:states" placeholder="no_rain"></label></div>${entHint}${valChips}`;
         }
         return `<div class="cond-card">
           <div class="row wrap">
@@ -1006,8 +1044,15 @@ class SkIrrigationPanel extends HTMLElement {
       .map((id) => {
         const m = this._entityMeta(id);
         return { id, name: this._entityName(id), sub: [m.device, id].filter(Boolean).join(" · "), group: m.area,
-          icon: this._hass.states[id].attributes.icon, rb: m.platform === "rainbird" };
+          icon: this._hass.states[id].attributes.icon, rb: m.platform === "rainbird", state: this._stateText(id) };
       });
+  }
+
+  _stateText(id) {
+    const st = this._hass.states[id];
+    if (!st) return null;
+    const unit = st.attributes.unit_of_measurement;
+    return `${st.state}${unit ? ` ${unit}` : ""}`;
   }
 
   _isSuggested(c) {
@@ -1032,7 +1077,7 @@ class SkIrrigationPanel extends HTMLElement {
     }
     if (kind === "rain-add") {
       return { title: this.t("rain_sensors"), multi: true,
-        items: this._entityItems(["binary_sensor", "input_boolean", "sensor"]).filter((i) => !this._config.settings.rain_sensors.includes(i.id)) };
+        items: this._entityItems(["binary_sensor", "input_boolean"]).filter((i) => !this._config.settings.rain_sensors.includes(i.id)) };
     }
     if (kind === "notify") {
       return { title: this.t("notify_service"), items: Object.keys(this._hass.services?.notify || {})
@@ -1047,15 +1092,16 @@ class SkIrrigationPanel extends HTMLElement {
     return { title: this._pkTitle || this.t("cond_entity"), items: this._entityItems(domains) };
   }
 
-  _openPicker(target, anchor) {
+  _openPicker(target, anchor, inline = false) {
     this._pkDomains = anchor.dataset.domains || "";
     this._pkTitle = anchor.dataset.title || "";
     const spec = this._pickerSpec(target);
-    anchor.scrollIntoView({ block: "nearest" });
+    if (!inline) anchor.scrollIntoView({ block: "nearest" });
     const r = anchor.getBoundingClientRect();
-    this._pk = { target, ...spec, query: "", sel: new Set(), idx: 0, rect: r, chip: spec.chip || "all" };
+    this._pk = { target, ...spec, query: inline ? anchor.value.trim() : "", sel: new Set(), idx: 0, rect: r,
+      chip: spec.chip || "all", inline };
     this._renderPicker();
-    setTimeout(() => this.shadowRoot.querySelector(".pk input")?.focus(), 30);
+    if (!inline) setTimeout(() => this.shadowRoot.querySelector(".pk input")?.focus(), 30);
   }
 
   _closePicker() {
@@ -1088,6 +1134,7 @@ class SkIrrigationPanel extends HTMLElement {
         ${p.multi ? `<span class="pk-check"><ha-icon icon="${on ? "mdi:checkbox-marked" : "mdi:checkbox-blank-outline"}"></ha-icon></span>`
           : i.color ? `<span class="swatch" style="background:${esc(i.color)}"></span>` : `<ha-icon class="pk-ic" icon="${esc(i.icon || "mdi:checkbox-blank-circle-outline")}"></ha-icon>`}
         <div class="pk-txt"><div class="pk-nm">${esc(i.name)}</div>${i.sub ? `<div class="pk-sub">${esc(i.sub)}</div>` : ""}</div>
+        ${i.state != null ? `<span class="pk-state">${esc(i.state)}</span>` : ""}
         ${i.rb ? `<span class="badge rb">Rain Bird</span>` : ""}
       </div>`;
     }).join("") + (list.length > p.flat.length ? `<div class="empty small">${this.t("refine_search", { n: list.length })}</div>` : "");
@@ -1097,8 +1144,8 @@ class SkIrrigationPanel extends HTMLElement {
     const p = this._pk;
     if (!p) return;
     if (!this._pkEl) { this._pkEl = document.createElement("div"); this._pkEl.className = "pk-root"; }
-    const narrow = window.innerWidth < 640;
-    const w = Math.min(460, window.innerWidth - 24);
+    const narrow = window.innerWidth < 640 && !p.inline;
+    const w = Math.min(p.inline ? Math.max(380, p.rect.width) : 460, window.innerWidth - 24);
     const vh = window.innerHeight;
     const below = vh - p.rect.bottom > 360 || p.rect.top < 360;
     const left = Math.max(12, Math.min(p.rect.left, window.innerWidth - w - 12));
@@ -1106,6 +1153,12 @@ class SkIrrigationPanel extends HTMLElement {
     const bottom = Math.max(12, Math.min(vh - p.rect.top + 6, vh - 372));
     const pos = narrow ? "left:8px;right:8px;bottom:8px;max-height:78vh"
       : `left:${left}px;width:${w}px;${below ? `top:${top}px` : `bottom:${bottom}px`}`;
+    if (p.inline) {
+      this._pkEl.innerHTML = `<div class="pk inline" style="${pos}" role="listbox">
+        <div class="pk-list" id="pk-list">${this._pkListHtml()}</div></div>`;
+      if (!this._pkEl.isConnected) this.shadowRoot.appendChild(this._pkEl);
+      return;
+    }
     this._pkEl.innerHTML = `<div class="pk-scrim ${narrow ? "dim" : ""}" data-action="pk-close"></div>
       <div class="pk" style="${pos}" role="dialog">
         <div class="pk-title">${esc(p.title)}<span class="spacer"></span><button class="btn icon" data-action="pk-close"><ha-icon icon="mdi:close"></ha-icon></button></div>
@@ -1181,7 +1234,7 @@ class SkIrrigationPanel extends HTMLElement {
     const name = value ? (target === "notify" ? value.replace(/^notify\./, "").replace(/_/g, " ") : this._entityName(value)) : "";
     return `<label class="field"><span>${label}</span><div class="pk-field">
       <button type="button" class="pk-btn ${value ? "" : "is-empty"}" data-action="pick" data-pick="${target}" data-domains="${domains}" data-title="${esc(label)}" ${can ? "" : "disabled"}>
-        <span class="pk-btn-txt">${value ? `<b>${esc(name)}</b><small>${esc(value)}</small>` : esc(placeholder || this.t("choose"))}</span>
+        <span class="pk-btn-txt">${value ? `<b>${esc(name)}</b><small>${esc(value)}${target !== "notify" && this._hass.states[value] ? ` · ${esc(this._stateText(value))}` : ""}</small>` : esc(placeholder || this.t("choose"))}</span>
         <ha-icon icon="mdi:menu-down"></ha-icon></button>
       ${value && can ? `<button type="button" class="btn icon" title="${this.t("clear")}" data-action="pk-clear" data-pick="${target}"><ha-icon icon="mdi:close"></ha-icon></button>` : ""}
     </div></label>`;
@@ -1208,9 +1261,21 @@ class SkIrrigationPanel extends HTMLElement {
           ${num("history_size", this.t("history_size"), 5, 500)}
         </div></div></div>
       <div class="card"><div class="hd"><h2><ha-icon icon="mdi:weather-pouring"></ha-icon>${this.t("s_conditions")}</h2></div><div class="bd">
+        <p class="hint">${this.t("skip_hint")}</p>
         <label class="field"><span>${this.t("rain_sensors")}</span></label>
-        <div class="chips" style="margin:6px 0 8px">${s.rain_sensors.map((e) => `<span class="chip">${esc(this._entityName(e))}
-          ${this._can() ? `<button class="btn icon" style="padding:0" data-action="del-rain" data-id="${esc(e)}"><ha-icon icon="mdi:close" style="--mdc-icon-size:14px"></ha-icon></button>` : ""}</span>`).join("")}</div>
+        <div class="stack" style="gap:6px;margin:6px 0 8px">${s.rain_sensors.map((e) => {
+          const st = this._hass.states[e];
+          const binary = ["binary_sensor", "input_boolean"].includes(e.split(".")[0]);
+          const wet = st && ["on", "wet", "rain", "raining", "true"].includes(st.state);
+          const badge = !st ? `<span class="badge red">${this.t("entity_not_found")}</span>`
+            : !binary ? `<span class="badge red" title="${esc(this.t("not_binary_hint"))}"><ha-icon icon="mdi:alert-outline" style="--mdc-icon-size:13px"></ha-icon>${this.t("not_binary")}</span>`
+            : wet ? `<span class="badge amber"><ha-icon icon="mdi:weather-pouring" style="--mdc-icon-size:13px"></ha-icon>${this.t("raining_now")}</span>`
+            : `<span class="badge green"><ha-icon icon="mdi:weather-sunny" style="--mdc-icon-size:13px"></ha-icon>${this.t("dry_now")}</span>`;
+          return `<div class="rain-row"><div class="pk-txt"><div class="pk-nm">${esc(this._entityName(e))}</div>
+            <div class="pk-sub">${esc(e)}${st ? ` · ${esc(this._stateText(e))}` : ""}</div></div>${badge}
+            ${this._can() ? `<button class="btn icon" title="${this.t("delete")}" data-action="del-rain" data-id="${esc(e)}"><ha-icon icon="mdi:close"></ha-icon></button>` : ""}</div>
+            ${st && !binary ? `<div class="small warn-line">${this.t("not_binary_hint")}</div>` : ""}`;
+        }).join("")}</div>
         ${this._can() ? `<button class="btn sm" data-action="pick" data-pick="rain-add"><ha-icon icon="mdi:plus"></ha-icon>${this.t("add_sensor")}</button>` : ""}
         <div class="fields" style="margin-top:14px">
           ${ent("weather_entity", this.t("weather_entity"), ["weather"])}
@@ -1218,7 +1283,9 @@ class SkIrrigationPanel extends HTMLElement {
           ${num("freeze_threshold", this.t("freeze_threshold"), -50, 50, 0.5)}
         </div>
         <label class="field" style="margin-top:14px"><span>${this.t("weather_conditions")}</span></label>
-        <div class="chips" style="margin-top:6px">${WEATHER.map((w) => `<button class="chip ${s.weather_conditions.includes(w) ? "on" : ""}" data-action="toggle-weather" data-id="${w}" ${can}>${w}</button>`).join("")}</div>
+        <div class="chips" style="margin-top:6px">${WEATHER.map((w) => `<button class="chip ${s.weather_conditions.includes(w) ? "on" : ""} ${this._hass.states[s.weather_entity]?.state === w ? "now" : ""}" data-action="toggle-weather" data-id="${w}" ${can}
+          title="${this._hass.states[s.weather_entity]?.state === w ? esc(this.t("current_weather")) : ""}">${w}</button>`).join("")}</div>
+        <p class="hint" style="margin-top:12px">${this.t("skip_scope_hint")}</p>
       </div></div>
       <div class="card" style="grid-column:1/-1"><div class="hd"><h2><ha-icon icon="mdi:shield-check-outline"></ha-icon>${this.t("s_custom_conditions")}</h2></div><div class="bd">
         <p class="hint">${this.t("custom_cond_hint")}</p>
@@ -1238,6 +1305,8 @@ class SkIrrigationPanel extends HTMLElement {
           <button class="btn" data-action="export"><ha-icon icon="mdi:download"></ha-icon>${this.t("export")}</button>
           ${this._can() ? `<label class="btn"><ha-icon icon="mdi:upload"></ha-icon>${this.t("import")}<input type="file" accept="application/json" data-bind="import" hidden></label>` : ""}
         </div>
+        <div class="donate"><div><b>☕ ${this.t("donate_title")}</b><div class="small muted">${this.t("donate_text")}</div></div>
+          <a class="btn donate-btn" href="https://www.paypal.com/donate/?business=gerencia%40skynetcom.com.ar&currency_code=USD&item_name=SK+Irrigation+Manager" target="_blank" rel="noopener"><ha-icon icon="mdi:coffee"></ha-icon>${this.t("donate_btn")}</a></div>
         <p class="hint" style="margin-top:16px">SK Irrigation Manager v${esc(this._version || "")}</p>
       </div></div>
     </div>`;
@@ -1395,6 +1464,16 @@ class SkIrrigationPanel extends HTMLElement {
         break;
       }
       case "groups-from-areas": this._groupsFromAreas(); break;
+      case "cond-val": {
+        const scope = el.dataset.scope;
+        const c = this._condList(scope)[n];
+        c.states = c.states || [];
+        const v = el.dataset.v;
+        c.states = c.states.includes(v) ? c.states.filter((x) => x !== v) : [...c.states, v];
+        if (scope === "settings") this._queueSave("settings"); else this._dirty = true;
+        this._scheduleCondCheck();
+        break;
+      }
       // conditions
       case "add-cond":
       case "del-cond":
@@ -1558,6 +1637,12 @@ class SkIrrigationPanel extends HTMLElement {
 
   _onInput(e) {
     const el = e.target;
+    if (el.dataset.suggest && this._pk?.inline) {
+      this._pk.query = el.value.trim();
+      this._pk.idx = 0;
+      this._refreshPickerList(false);
+      return;
+    }
     if (el.dataset.bind === "pk-search" && this._pk) {
       this._pk.query = el.value;
       this._pk.idx = 0;
@@ -1614,6 +1699,10 @@ class SkIrrigationPanel extends HTMLElement {
       case "cond": {
         const [, scope, idx, field] = bind.split(":");
         const c = this._condList(scope)[Number(idx)];
+        if (field === "entity_id" && v && !this._hass.states[String(v).trim()] && !String(v).includes(".")) {
+          el.value = c.entity_id || "";  // free text that isn't an entity: keep the previous one
+          return;
+        }
         if (field === "states") v = String(v).split(",").map((x) => x.trim()).filter(Boolean);
         if (["entity_id", "attribute"].includes(field)) v = String(v).trim() || null;
         c[field] = v;

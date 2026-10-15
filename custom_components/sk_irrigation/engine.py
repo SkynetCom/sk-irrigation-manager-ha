@@ -119,6 +119,8 @@ class IrrigationEngine:
         self._task: asyncio.Task | None = None
         self._ticker: asyncio.Task | None = None
         self._master_on = False
+        self._cond_unsub: Callable[[], None] | None = None
+        self._cond_notify_handle = None
 
     # ------------------------------------------------------------------ data
     @property
@@ -159,6 +161,7 @@ class IrrigationEngine:
     # ------------------------------------------------------------ lifecycle
     async def async_start(self) -> None:
         self._unsubs.append(async_track_time_change(self.hass, self._async_tick, second=0))
+        self._watch_condition_entities()
         # A run that was interrupted by a restart leaves valves open: close them.
         if self.store.interrupted:
             _LOGGER.warning("Previous run was interrupted, closing all zones")
@@ -169,6 +172,11 @@ class IrrigationEngine:
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
+        if self._cond_unsub:
+            self._cond_unsub()
+            self._cond_unsub = None
+        if self._cond_notify_handle:
+            self._cond_notify_handle.cancel()
         self.queue.clear()
         if self._task:
             self._task.cancel()
@@ -209,7 +217,36 @@ class IrrigationEngine:
         after = {p["id"] for p in self.config["programs"]}
         if key == "programs" or before != after:
             async_dispatcher_send(self.hass, SIGNAL_PROGRAMS_CHANGED)
+        self._watch_condition_entities()
         self.notify(config_changed=True)
+
+    @callback
+    def _watch_condition_entities(self) -> None:
+        """Push state as soon as any entity used by skip/custom conditions changes."""
+        s = self.settings
+        ids = set(s.get("rain_sensors", []))
+        ids.update(e for e in (s.get("weather_entity"), s.get("freeze_sensor"), s.get("budget_entity")) if e)
+        conditions = list(s.get("conditions", []))
+        for program in self.config["programs"]:
+            conditions.extend(program.get("conditions", []))
+        ids.update(c["entity_id"] for c in conditions if c.get("entity_id"))
+        if self._cond_unsub:
+            self._cond_unsub()
+            self._cond_unsub = None
+        if ids:
+            self._cond_unsub = async_track_state_change_event(self.hass, sorted(ids), self._on_condition_entity)
+
+    @callback
+    def _on_condition_entity(self, event: Event) -> None:
+        # Debounce bursts (e.g. several Sol-Ark sensors updating together).
+        if self._cond_notify_handle:
+            self._cond_notify_handle.cancel()
+        self._cond_notify_handle = self.hass.loop.call_later(1, self._flush_condition_notify)
+
+    @callback
+    def _flush_condition_notify(self) -> None:
+        self._cond_notify_handle = None
+        self.notify()
 
     async def async_set_enabled(self, enabled: bool) -> None:
         settings = dict(self.settings, enabled=enabled)
@@ -752,12 +789,19 @@ class IrrigationEngine:
                 "pending": list(run.pending),
                 "done": run.done,
             }
+        zones_by_id, groups_by_id = self.zones_by_id(), self.groups_by_id()
+        program_estimates = {}
+        for p in self.config["programs"]:
+            zd, sd = self._delays(p)
+            plan = build_program_plan(p, zones_by_id, groups_by_id, self.budget_percent(), self.settings["max_zone_minutes"])
+            program_estimates[p["id"]] = estimate_plan_seconds(plan, self.settings["max_concurrent"], zd, sd)
         program_blocks = {
             p["id"]: self.condition_failures(p["conditions"]) for p in self.config["programs"] if p.get("conditions")
         }
         return {
             "now": now.isoformat(),
             "program_blocks": program_blocks,
+            "program_estimates": program_estimates,
             "status": self.status(),
             "current": current,
             "queue": [r.summary() for r in self.queue],

@@ -5,6 +5,7 @@
 <p align="center">
   <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=SkynetCom&repository=sk-irrigation-manager-ha&category=integration"><img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Abrir en HACS"></a>
   <a href="https://my.home-assistant.io/redirect/config_flow_start/?domain=sk_irrigation"><img src="https://my.home-assistant.io/badges/config_flow_start.svg" alt="Agregar integración"></a>
+  <br><a href="https://www.paypal.com/donate/?business=gerencia%40skynetcom.com.ar&currency_code=USD&item_name=SK+Irrigation+Manager"><img src="https://img.shields.io/badge/%E2%98%95%20Invitame%20un%20caf%C3%A9-PayPal-ffdd00?logo=paypal&logoColor=003087&labelColor=ffdd00&style=for-the-badge" alt="Invitame un café"></a>
 </p>
 
 <p align="center">
@@ -232,6 +233,11 @@ Estructura: `custom_components/sk_irrigation/` (motor, scheduler, API websocket,
 
 Historial de versiones en [CHANGELOG.md](https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/CHANGELOG.md).
 
+## ☕ Apoyá el proyecto
+Si SK Irrigation Manager te ahorra agua y tiempo, podés invitarme un café para que siga mejorándolo. ¡Gracias!
+
+<p align="center"><a href="https://www.paypal.com/donate/?business=gerencia%40skynetcom.com.ar&currency_code=USD&item_name=SK+Irrigation+Manager"><img src="https://img.shields.io/badge/%E2%98%95%20Invitame%20un%20caf%C3%A9-PayPal-ffdd00?logo=paypal&logoColor=003087&labelColor=ffdd00&style=for-the-badge" alt="Invitame un café"></a></p>
+
 ## 📄 Licencia
 [MIT](https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/LICENSE) © SK / SkynetCom
 
@@ -247,5 +253,7 @@ Historial de versiones en [CHANGELOG.md](https://github.com/SkynetCom/sk-irrigat
 - **Smart conditions** (state, numeric or Jinja template), global or per program. They can optionally be **re-checked before each sprinkler and while watering**, which suits rain totals or solar/battery protection.
 - **Gantt preview**, live dashboard, water budget (global, per program or from a sensor such as Smart Irrigation), master valve or pump, global concurrency limit, history, notifications and JSON backup.
 - **Rain Bird native**: exact durations through `rainbird.start_irrigation`.
+
+**Like it?** [Buy me a coffee via PayPal](https://www.paypal.com/donate/?business=gerencia%40skynetcom.com.ar&currency_code=USD&item_name=SK+Irrigation+Manager) ☕
 
 **Install:** HACS → Custom repositories → `https://github.com/SkynetCom/sk-irrigation-manager-ha` (category *Integration*). Then restart and add the **SK Irrigation Manager** integration. The UI is available in Spanish and English and follows your HA language.

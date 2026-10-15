@@ -29,6 +29,7 @@ from .websocket_api import async_register_websocket
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR, Platform.SWITCH]
+CARDS_URL = f"{STATIC_URL}/sk-irrigation-cards.js?v={VERSION}"
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -52,6 +53,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async_register_services(hass)
     await _async_register_panel(hass, entry)
+    # Dashboard cards are loaded globally so they show up in the card picker.
+    frontend.add_extra_js_url(hass, CARDS_URL)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
@@ -82,6 +85,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         engine: IrrigationEngine = entry.runtime_data
         await engine.async_stop()
         frontend.async_remove_panel(hass, PANEL_URL_PATH)
+        frontend.remove_extra_js_url(hass, CARDS_URL)
         async_unregister_services(hass)
         hass.data[DOMAIN].pop("engine", None)
     return unloaded

@@ -234,3 +234,16 @@ async def test_unavailable_sprinkler_is_skipped(hass):
     assert last["status"] == "completed"
     assert last["zones"][0] == {**last["zones"][0], "zone_id": "z1", "seconds": 0, "skipped": "unavailable"}
     assert [z["zone_id"] for z in last["zones"]][1:] == ["z2", "z3", "z4"]
+
+
+async def test_estimates_and_instant_condition_push(hass):
+    _, engine = await _setup(hass)
+    await _configure(engine, concurrency=2, minutes=1)
+    est = engine.state_dict()["program_estimates"]["p1"]
+    assert est == 2 * 60 + 60  # 3 zones x1 min with 2 slots = 2 min, then g2 1 min (no delays)
+    await engine.async_save("settings", {**engine.settings, "conditions": [SOC_RECHECK]})
+    pushes = []
+    engine.async_add_listener(lambda payload: pushes.append(payload["state"]["blocking"]))
+    hass.states.async_set("sensor.soc", "10")
+    await asyncio.sleep(1.3)
+    assert pushes and any("Battery" in r for r in pushes[-1][0:1])

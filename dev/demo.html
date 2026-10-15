@@ -32,6 +32,9 @@
     }
   });
   customElements.define("ha-menu-button", class extends HTMLElement {});
+  customElements.define("ha-card", class extends HTMLElement {
+    connectedCallback() { this.style.cssText = "display:block;background:var(--card-background-color,#fff);border-radius:14px;border:1px solid var(--divider-color,rgba(0,0,0,.09));box-shadow:0 1px 2px rgba(0,0,0,.05);color:var(--primary-text-color,#1b2733);font-family:Roboto,system-ui,sans-serif"; }
+  });
 </script>
 </head>
 <body>
@@ -120,11 +123,22 @@ function nextRun(p) {
   const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(6, 0, 0, 0);
   return iso(d);
 }
+function estimate(p) {
+  let t = 0;
+  planProgram(p).forEach((s, si, all) => {
+    const lim = s.concurrency <= 0 ? s.zones.length : Math.min(s.concurrency, s.zones.length);
+    const slots = new Array(Math.max(1, lim)).fill(t); let end = t;
+    s.zones.forEach((z) => { const i = slots.indexOf(Math.min(...slots)); end = Math.max(end, slots[i] + z.seconds); slots[i] += z.seconds + 5; });
+    t = end + (si < all.length - 1 ? 10 : 0);
+  });
+  return t;
+}
 function state() {
   const next_runs = Object.fromEntries(config.programs.map((p) => [p.id, nextRun(p)]));
   const np = config.programs.find((p) => p.enabled);
   return { now: iso(Date.now()), status: current ? "running" : config.settings.enabled ? "idle" : "disabled",
     current, queue: queue.map((r) => ({ id: r.id, name: r.name, source: r.source, zones: r.zones })),
+    program_estimates: Object.fromEntries(config.programs.map((p) => [p.id, estimate(p)])),
     blocking: [...(config.settings.enabled ? [] : ["system_disabled"]), ...condFailures(config.settings.conditions)],
     program_blocks: Object.fromEntries(config.programs.filter((p) => p.conditions?.length).map((p) => [p.id, condFailures(p.conditions)])), budget: config.settings.global_budget, next_runs,
     next: np ? { program_id: np.id, name: np.name, at: next_runs[np.id] } : null, zone_stats: zoneStats, history };
@@ -224,10 +238,28 @@ const hass = {
   connection: { subscribeMessage: async (cb) => { listeners.add(cb); return () => listeners.delete(cb); } },
 };
 window.setLang = () => { const u = new URL(location); u.searchParams.set("lang", hass.language === "es" ? "en" : "es"); location = u; };
-const panel = document.createElement("sk-irrigation-panel");
-panel.hass = hass;
-panel.narrow = false;
-document.body.appendChild(panel);
+const qs0 = new URLSearchParams(location.search);
+let panel;
+if (qs0.get("cards")) {
+  // Dashboard cards preview: ?cards=1[&run=1]
+  await import("../custom_components/sk_irrigation/frontend/sk-irrigation-cards.js");
+  document.body.style.cssText = "margin:0;padding:24px;background:#f4f6f8;font-family:Roboto,system-ui,sans-serif";
+  const grid = document.createElement("div");
+  grid.style.cssText = "display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start;max-width:1500px;margin:0 auto";
+  const col = () => { const c = document.createElement("div"); c.style.cssText = "display:flex;flex-direction:column;gap:16px"; grid.appendChild(c); return c; };
+  const c1 = col(), c2 = col(), c3 = col();
+  const mk = (tag, cfg, parent) => { const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass; parent.appendChild(el); return el; };
+  window.cards = [mk("sk-irrigation-status-card", {}, c1), mk("sk-irrigation-programs-card", {}, c1),
+    mk("sk-irrigation-groups-card", {}, c2), mk("sk-irrigation-zones-card", { minutes: 5 }, c3)];
+  document.body.appendChild(grid);
+  panel = { set hass(h) { window.cards.forEach((c) => { c.hass = h; }); }, _action: (a, x) => handlers["sk_irrigation/action"]({ action: a, ...x }), _render() {} };
+  document.getElementById("ctl").style.display = "none";
+} else {
+  panel = document.createElement("sk-irrigation-panel");
+  panel.hass = hass;
+  panel.narrow = false;
+  document.body.appendChild(panel);
+}
 window.panel = panel;
 
 // Deep links for screenshots: ?tab=programs&edit=0&run=1&dark=1

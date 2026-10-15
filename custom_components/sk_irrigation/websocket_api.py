@@ -89,6 +89,7 @@ async def ws_import(hass: HomeAssistant, connection: websocket_api.ActiveConnect
         return _not_loaded(connection, msg)
     await engine.store.async_replace(msg["config"])
     async_dispatcher_send(hass, SIGNAL_PROGRAMS_CHANGED)
+    engine._watch_condition_entities()
     engine.notify(config_changed=True)
     connection.send_result(msg["id"], {"config": engine.config})
 
