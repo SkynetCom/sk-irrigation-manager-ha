@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.0 — sin publicar
+## 1.3.0 — 2026-10-15
 - **Línea de tiempo interactiva** en el editor de programas: arrastrá el borde de una barra para cambiar
   el tiempo de ese aspersor (pasos de 30 s) o la barra entera para cambiar su orden de encendido; zoom
   con desplazamiento horizontal para ciclos largos.
