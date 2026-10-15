@@ -57,7 +57,7 @@ for (const [id, name] of [["valve.goteo_huerta", "Goteo huerta"], ["switch.bomba
 states["binary_sensor.rain"] = { entity_id: "binary_sensor.rain", state: "off", attributes: { friendly_name: "Sensor de lluvia" } };
 states["weather.home"] = { entity_id: "weather.home", state: "sunny", attributes: { friendly_name: "Clima casa" } };
 for (const [id, v, n] of [["sensor.the_ark_sensors_precipitation_description", "no_rain", "Descripción de lluvia"],
-  ["sensor.the_ark_sensors_precipitation_today", "0.4", "Lluvia hoy (mm)"], ["sensor.the_ark_sensors_precipitation_yesterday", "6.2", "Lluvia ayer (mm)"],
+  ["sensor.the_ark_sensors_precipitation_today", "0.4", "Lluvia hoy (mm)"], ["sensor.the_ark_sensors_precipitation_yesterday", "1.8", "Lluvia ayer (mm)"],
   ["sensor.solark_total_grid_power", "0", "Potencia red/generador (W)"], ["sensor.solark_system_soc", "64", "Batería (%)"]]) {
   states[id] = { entity_id: id, state: v, attributes: { friendly_name: n } };
 }

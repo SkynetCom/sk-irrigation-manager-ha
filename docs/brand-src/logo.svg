@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1100" height="256" viewBox="0 0 1100 256">
+  <image href="icon.svg" x="0" y="0" width="256" height="256"/>
+  <text x="290" y="128" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="100" font-weight="700" fill="#14243a" letter-spacing="-1">SK Irrigation</text>
+  <text x="294" y="200" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="50" font-weight="400" fill="#5b6b7f" letter-spacing="1">Manager for Home Assistant</text>
+</svg>

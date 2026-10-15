@@ -6,3 +6,4 @@ venv/
 .DS_Store
 .claude/
 mi-configuracion-riego.json
+.ha-dev/

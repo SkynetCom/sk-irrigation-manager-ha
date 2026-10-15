@@ -8,6 +8,7 @@
 - Comportamiento si el sensor no está disponible: no regar o ignorar la condición.
 - Las condiciones se aplican también a riegos manuales y servicios (configurable); el panel avisa el motivo.
 - Los aspersores `unavailable`/`unknown` se saltean y la secuencia continúa.
+- Ícono y logo propios (`brand/`, HA 2026.3+) visibles en HA y HACS; README rediseñado con banner.
 - Nuevo sensor **Aspersor actual** con `ends_at` y `remaining_seconds` (reemplaza timers auxiliares).
 
 ## 1.1.0 — 2026-10-15

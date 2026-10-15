@@ -1,119 +1,257 @@
-# SK Irrigation Manager for Home Assistant
+<p align="center">
+  <img src="docs/banner.png" alt="SK Irrigation Manager for Home Assistant" width="100%">
+</p>
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
-[![Validate](https://github.com/SkynetCom/sk-irrigation-manager-ha/actions/workflows/validate.yml/badge.svg)](https://github.com/SkynetCom/sk-irrigation-manager-ha/actions/workflows/validate.yml)
-![HA](https://img.shields.io/badge/Home%20Assistant-2024.11%2B-blue)
+<p align="center">
+  <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=SkynetCom&repository=sk-irrigation-manager-ha&category=integration"><img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Abrir en HACS"></a>
+  <a href="https://my.home-assistant.io/redirect/config_flow_start/?domain=sk_irrigation"><img src="https://my.home-assistant.io/badges/config_flow_start.svg" alt="Agregar integración"></a>
+</p>
 
-Gestor de riego profesional para Home Assistant con **panel propio**, **grupos drag & drop**, **secuencias con encendido simultáneo configurable** y **múltiples programas por día**. Funciona con **Rain Bird** (con soporte nativo de duración) y con cualquier aspersor/válvula expuesto como `switch`, `valve`, `input_boolean`, `light` o `fan` (OpenSprinkler, Sonoff, Shelly, ESPHome, Zigbee, Z-Wave, relés, etc.).
+<p align="center">
+  <a href="https://github.com/SkynetCom/sk-irrigation-manager-ha/releases"><img src="https://img.shields.io/github/v/release/SkynetCom/sk-irrigation-manager-ha?include_prereleases&label=versi%C3%B3n&color=1e88e5" alt="Versión"></a>
+  <a href="https://hacs.xyz/docs/faq/custom_repositories"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS"></a>
+  <img src="https://img.shields.io/badge/Home%20Assistant-2024.11%2B-18bcf2?logo=homeassistant&logoColor=white" alt="Home Assistant">
+  <a href="https://github.com/SkynetCom/sk-irrigation-manager-ha/actions/workflows/validate.yml"><img src="https://github.com/SkynetCom/sk-irrigation-manager-ha/actions/workflows/validate.yml/badge.svg" alt="Validate"></a>
+  <img src="https://img.shields.io/badge/idiomas-ES%20%7C%20EN-2e9e6b" alt="Idiomas">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/SkynetCom/sk-irrigation-manager-ha?color=8e44ad" alt="Licencia"></a>
+</p>
 
-> 🇬🇧 English summary at the [bottom](#english).
-
-![Panel en vivo](docs/dashboard.png)
-
-| Grupos drag & drop | Editor de programas con vista previa |
-|---|---|
-| ![Grupos](docs/groups.png) | ![Editor](docs/program-editor.png) |
-
-![Programas (tema oscuro)](docs/programs.png)
-
-![Condiciones personalizadas](docs/conditions.png)
+<p align="center">
+  <b>Gestor de riego profesional para Home Assistant</b> — panel propio, grupos con drag &amp; drop,<br>
+  programas con varios horarios, encendido simultáneo, condiciones inteligentes y soporte nativo para <b>Rain Bird</b>.<br>
+  <sub>🇬🇧 <a href="#-english">English summary below</a></sub>
+</p>
 
 ---
 
-## ¿Por qué otro módulo de riego?
+## ✨ Destacados
 
-| | Irrigation Unlimited | Smart Irrigation | Rain Bird (core) | OpenSprinkler | **SK Irrigation Manager** |
-|---|---|---|---|---|---|
-| Configuración | YAML extenso | UI (solo cálculo) | Integración de dispositivo | Depende del controlador | **Panel visual completo** |
-| Grupos de aspersores | Sí (YAML) | No | No | Estaciones | **Drag & drop** |
-| Encendido simultáneo N a la vez | Parcial | No | No | Limitado | **1 / 2 / 3 / 4 / todos / N por paso** |
-| Tiempo fijo o por aspersor | YAML | Calcula duración | Fijo | Sí | **Ambos, por paso** |
-| Varios horarios por día | Sí | No aplica | No | Sí | **Ilimitados (fijo, amanecer, atardecer)** |
-| Días/mes/año, pares/impares, fechas | Sí (YAML) | No | No | Parcial | **Sí, + meses activos (temporadas)** |
-| Vista previa / línea de tiempo | No | No | No | No | **Gantt en el editor** |
-| Lluvia / clima / helada | Plantillas | ET | No | Sensor | **Sensores + clima + temperatura + retraso** |
-| Presupuesto hídrico | Manual | Sí | No | Sí | **Global, por programa y por sensor (compatible con Smart Irrigation)** |
-| Válvula maestra / bomba | Sí | No | No | Sí | **Sí, con adelanto/retardo** |
-| Rain Bird: duración real | — | — | Duración por defecto fija | — | **Usa `rainbird.start_irrigation` con la duración exacta** |
+<table>
+<tr>
+<td width="33%" valign="top">
 
-Ideas tomadas de cada uno: la potencia de secuencias de *Irrigation Unlimited*, el presupuesto de *Smart Irrigation* (podés conectar su sensor de % directamente) y la simplicidad de los controladores comerciales — pero todo editable desde una UI.
+### 🧩 Drag &amp; drop
+Arrastrá tus dispositivos de Home Assistant a grupos y armá la secuencia de cada programa arrastrando grupos y aspersores. Funciona con mouse y en pantallas táctiles.
 
-## Características
+</td>
+<td width="33%" valign="top">
 
-- **Panel lateral** propio, responsive (escritorio, tablet y móvil), modo claro/oscuro según tu tema, en **español e inglés**.
-- **Flujo simple: Aspersores → Grupos → Programas.** Los aspersores son directamente tus dispositivos de HA (switches, válvulas, Rain Bird…), leídos automáticamente junto con su **área nativa de HA**.
-- **Grupos con drag & drop** (mouse y táctil): arrastrá dispositivos a grupos, reordená, soltá en la lista para quitar o en "Nuevo grupo" para crear uno. Filtros por área / Rain Bird / sin grupo y botón **Crear grupos desde las áreas de HA**. Un aspersor puede estar en varios grupos; con el lápiz editás nombre, color, caudal o lo probás 1 minuto.
-- **Programas**:
-  - Calendario: días de la semana, cada N días, días del mes, impares, pares o fechas específicas (con repetición anual), filtrado por **meses activos**.
-  - **Múltiples horarios por día**: hora fija, amanecer o atardecer con desfase.
-  - **Secuencia** armada arrastrando grupos; cada paso define:
-    - **Modo de encendido**: secuencial, 2, 3, 4, todos o cualquier N a la vez (cola rodante: cuando termina un aspersor arranca el siguiente, sin esperar al lote completo).
-    - **Tiempo**: igual para todos los aspersores o **uno por uno**.
-    - **Orden de encendido por drag & drop**: definís qué aspersor arranca primero y cuál después, y podés omitir un aspersor solo en ese programa.
-  - Ajuste de tiempos (%), pausa entre aspersores y entre grupos, qué hacer si hay otro riego en curso (encolar u omitir), ignorar sensores.
-  - **Vista previa** con duración estimada, consumo de agua y **línea de tiempo (Gantt)**.
-- **Panel en vivo**: progreso general, aspersores activos con cuenta regresiva, saltar zona, detener todo, cola de ejecución y riego manual de zonas o grupos.
-- **Condiciones**: sensores de lluvia, entidad de clima, temperatura de helada, retraso por lluvia (24/48/72 h) y presupuesto global o por sensor.
-- **Condiciones personalizadas sin YAML** (globales o por programa): estado (`no_rain`), numéricas (lluvia acumulada < 5 mm, batería > 20 %, generador < 50 W…) o plantillas Jinja, con ✓/✗ en vivo. Se pueden **re-verificar antes de cada aspersor y durante el riego** para cortar si cambia la energía, y elegir qué hacer si el sensor no está disponible.
-- Si un aspersor está `unavailable`, se saltea y la secuencia sigue.
-- **Hidráulica**: válvula maestra o bomba con adelanto/retardo y **límite global de zonas simultáneas** (protege la presión del sistema).
-- **Seguridad**: si HA se reinicia durante un riego, al volver cierra todas las válvulas; si alguien apaga una zona manualmente, la secuencia continúa con la siguiente; tiempo máximo por zona.
-- **Historial** con duración y litros estimados, notificaciones opcionales y **exportar/importar** la configuración en JSON.
+### 🗓️ Programas flexibles
+Varios horarios por día (hora fija, amanecer o atardecer). Días de la semana, cada N días, días del mes, pares o impares, fechas puntuales y meses activos.
 
-## Instalación
+</td>
+<td width="33%" valign="top">
+
+### 💦 Encendido a medida
+Secuencial o de a 2, 3, 4… aspersores a la vez, con una cola continua. Tiempo igual para todos o **uno por uno**, en el orden que elijas.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+### 🌦️ Condiciones inteligentes
+Sensores de lluvia, mm acumulados, clima, helada, energía solar o batería, o cualquier plantilla Jinja. Se pueden **re-verificar durante el riego** y cortarlo si dejan de cumplirse.
+
+</td>
+<td valign="top">
+
+### 📊 Vista previa Gantt
+Antes de guardar, ves la duración estimada, los litros y la línea de tiempo exacta de cada aspersor.
+
+</td>
+<td valign="top">
+
+### 🛡️ Seguro por diseño
+Válvula maestra o bomba, límite hidráulico de aspersores simultáneos, tiempo máximo por aspersor, cierre de válvulas tras un reinicio y salto de los aspersores no disponibles.
+
+</td>
+</tr>
+</table>
+
+## 🧭 Cómo funciona
+
+```mermaid
+flowchart LR
+    A["🔌 Aspersores<br/><sub>tus dispositivos de HA<br/>(Rain Bird, switch, valve…)</sub>"] -->|drag & drop| B["🗂️ Grupos<br/><sub>Frente · Laterales · Fondo<br/>o por área de HA</sub>"]
+    B -->|drag & drop| C["🗓️ Programas<br/><sub>días · horarios · orden<br/>tiempos · condiciones</sub>"]
+    C --> D{"✅ ¿Condiciones OK?"}
+    D -->|sí| E["💧 Riego<br/><sub>secuencial o N a la vez</sub>"]
+    D -->|no| F["⏭️ Omitido<br/><sub>queda en el historial</sub>"]
+```
+
+## 📸 Capturas
+
+<p align="center"><img src="docs/dashboard.png" alt="Panel en vivo" width="100%"></p>
+
+| Grupos con drag &amp; drop | Editor de programas con vista previa |
+|---|---|
+| <img src="docs/groups.png" alt="Grupos"> | <img src="docs/program-editor.png" alt="Editor de programas"> |
+| **Condiciones personalizadas** | **Programas (tema oscuro)** |
+| <img src="docs/conditions.png" alt="Condiciones"> | <img src="docs/programs.png" alt="Programas"> |
+
+> 💡 ¿Querés probar la interfaz sin instalar nada? Abrí [`dev/demo.html`](dev/demo.html) con un servidor local (ver [Desarrollo](#-desarrollo)).
+
+## 🚀 Instalación
 
 ### HACS (recomendado)
-1. HACS → ⋮ → **Repositorios personalizados** → URL `https://github.com/SkynetCom/sk-irrigation-manager-ha`, tipo **Integration**.
-2. Buscá **SK Irrigation Manager** e instalalo.
-3. Reiniciá Home Assistant.
-4. **Ajustes → Dispositivos y servicios → Agregar integración → SK Irrigation Manager**.
-5. Aparece **Riego** en la barra lateral.
+1. Tocá el botón **Abrir en HACS** de arriba, o en HACS → ⋮ → **Repositorios personalizados** agregá
+   `https://github.com/SkynetCom/sk-irrigation-manager-ha` con la categoría **Integración**.
+2. Instalá **SK Irrigation Manager** y **reiniciá Home Assistant**.
+3. **Ajustes → Dispositivos y servicios → + Agregar integración → SK Irrigation Manager** (o el botón **Agregar integración** de arriba).
+4. Aparece **Riego** en la barra lateral. Si no lo ves, recargá el navegador con Ctrl+F5.
 
 ### Manual
-Copiá `custom_components/sk_irrigation` en `config/custom_components/` y reiniciá.
+Copiá `custom_components/sk_irrigation` en `config/custom_components/`, reiniciá y seguí desde el paso 3.
 
-## Uso rápido
-1. **Grupos** → arrastrá tus aspersores (dispositivos de HA) a grupos, o tocá *Crear grupos desde las áreas de HA*.
-2. **Programas** → *Nuevo programa* → días y horarios → arrastrá grupos a la secuencia → en cada grupo elegí cuántos aspersores a la vez, el tiempo (igual o uno por uno) y arrastrá los aspersores para definir el orden → **Guardar**.
+| Requisito | Versión |
+|---|---|
+| Home Assistant | 2024.11 o superior |
+| Ícono propio en la lista de integraciones | 2026.3 o superior (versiones anteriores muestran un ícono genérico) |
 
-## Entidades y servicios
+## ⚡ Puesta en marcha en 3 pasos
+
+1. **Grupos** → arrastrá tus aspersores a grupos, o tocá **Crear grupos desde las áreas de HA**.
+2. **Programas** → **Nuevo programa** → elegí días y horarios → arrastrá grupos a la secuencia. En cada grupo definí cuántos aspersores a la vez, el tiempo (igual o uno por uno) y el orden de encendido.
+3. **Ajustes** → sumá tus condiciones (lluvia, clima, energía…) y, si tenés, la válvula maestra o la bomba.
+
+¡Listo! El **Panel** muestra el próximo riego, el progreso en vivo con cuenta regresiva y el estado de cada condición.
+
+## 🌦️ Condiciones: ejemplos
+
+| Necesidad | Tipo | Configuración |
+|---|---|---|
+| No regar si llueve | Estado | `sensor.descripcion_lluvia` **es** `no_rain` |
+| No regar si llovió ≥ 5 mm hoy | Numérica | `sensor.lluvia_hoy` **menor que** `5` · si no está disponible → *ignorar* |
+| Solo con generador apagado | Numérica | `sensor.potencia_red` **menor que** `50` · ✅ *re-verificar durante el riego* |
+| Proteger la batería | Numérica | `sensor.bateria_soc` **mayor que** `20` · ✅ *re-verificar durante el riego* |
+| Lógica avanzada | Plantilla | `{{ states('sensor.viento') \| float(0) < 30 and now().hour < 9 }}` |
+
+Las condiciones pueden ser **globales** (valen para todos los programas) o **solo de un programa**. Opcionalmente también se aplican a los riegos manuales y a los servicios.
+
+## 🔄 ¿Venís de scripts y automatizaciones YAML?
+
+| Antes (YAML) | Ahora |
+|---|---|
+| Script con `repeat: for_each` + `delay` por aspersor | Un programa con orden y tiempo por aspersor |
+| Varias llamadas al script con distintas duraciones | Pasos de la secuencia, o un grupo con tiempos **uno por uno** |
+| `condition:` en la automatización y en el loop | Condiciones globales o por programa, con **re-verificación** |
+| `mode: queued` | Cola de ejecución incorporada |
+| Script "PARAR RIEGO" | Botón **Detener todo** / servicio `sk_irrigation.stop_all` |
+| `timer` auxiliar para la cuenta regresiva | Sensores **Próximo riego** y **Aspersor actual** (`ends_at`, `remaining_seconds`) |
+
+Tu configuración se puede **exportar e importar** como JSON desde *Ajustes → Respaldo*.
+
+## 🆚 Comparativa
+
+| | Irrigation Unlimited | Smart Irrigation | Rain Bird (oficial) | **SK Irrigation Manager** |
+|---|:---:|:---:|:---:|:---:|
+| Configuración visual completa | ❌ YAML | ⚠️ Solo cálculo | ❌ | ✅ |
+| Grupos con drag &amp; drop | ❌ | ❌ | ❌ | ✅ |
+| N aspersores a la vez por paso | ⚠️ | ❌ | ❌ | ✅ |
+| Orden y tiempo por aspersor | ⚠️ YAML | ❌ | ❌ | ✅ |
+| Varios horarios por día, sol, temporadas | ✅ | — | ❌ | ✅ |
+| Condiciones con re-verificación en vivo | ⚠️ Plantillas | ❌ | ❌ | ✅ |
+| Vista previa / Gantt | ❌ | ❌ | ❌ | ✅ |
+| Presupuesto hídrico | ✅ | ✅ | ❌ | ✅ (incluye el sensor de Smart Irrigation) |
+| Duración exacta en Rain Bird | — | — | ⚠️ Fija | ✅ `rainbird.start_irrigation` |
+
+## 🧱 Entidades y servicios
 
 | Entidad | Descripción |
 |---|---|
-| `switch.sk_irrigation_manager_sistema_de_riego` | Habilita/deshabilita todos los programas |
-| `switch.sk_irrigation_manager_programa_<nombre>` | Un switch por programa |
-| `sensor.sk_irrigation_manager_estado` | `idle`, `running`, `paused`, `rain_delay`, `disabled` (+ atributos: programa, zonas activas, cola, motivos) |
-| `sensor.sk_irrigation_manager_proximo_riego` | Fecha/hora del próximo riego |
-| `sensor.sk_irrigation_manager_tiempo_restante` | Minutos restantes del riego actual |
-| `sensor.sk_irrigation_manager_zonas_activas` | Cantidad de aspersores regando |
-| `sensor.sk_irrigation_manager_aspersor_actual` | Aspersor regando ahora, con `ends_at` y `remaining_seconds` |
+| **Estado** (sensor) | `idle`, `running`, `paused`, `rain_delay`, `disabled` + atributos (programa, aspersores activos, cola, motivos) |
+| **Próximo riego** (sensor) | Fecha y hora del próximo riego y el programa |
+| **Aspersor actual** (sensor) | Qué está regando, `ends_at` y `remaining_seconds` |
+| **Tiempo restante** (sensor) | Minutos que faltan para terminar el riego en curso |
+| **Zonas activas** (sensor) | Cantidad de aspersores regando |
+| **Sistema de riego** (switch) | Habilita o deshabilita todos los programas |
+| **Programa …** (switch) | Un switch por programa |
 
-Servicios: `sk_irrigation.run_program`, `run_group`, `run_zone`, `stop_all`, `skip`, `set_rain_delay`.
+| Servicio | Uso |
+|---|---|
+| `sk_irrigation.run_program` | Ejecutar un programa (`program`: nombre o id) |
+| `sk_irrigation.run_group` | Regar un grupo (`group`, `duration`, `concurrency`) |
+| `sk_irrigation.run_zone` | Regar un aspersor (`zone`: nombre o entity_id, `duration`) |
+| `sk_irrigation.skip` | Saltar al siguiente aspersor |
+| `sk_irrigation.stop_all` | Detener todo y vaciar la cola |
+| `sk_irrigation.set_rain_delay` | Suspender por N horas (0 = quitar) |
 
 ```yaml
-# Ejemplo: regar el frente 8 minutos, de a 2 aspersores
-action: sk_irrigation.run_group
-data:
-  group: "Jardín frontal"
-  duration: 8
-  concurrency: 2
+# Ejemplo: riego extra del frente si hace calor
+automation:
+  - alias: Riego extra por calor
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.temperatura_exterior
+        above: 35
+    actions:
+      - action: sk_irrigation.run_group
+        data:
+          group: "Jardín frontal"
+          duration: 5
+          concurrency: 2
 ```
 
-## Notas sobre Rain Bird
-La integración oficial de Rain Bird abre la zona con una duración por defecto (configurable en sus opciones). SK Irrigation Manager detecta las entidades de la plataforma `rainbird` y usa `rainbird.start_irrigation` con la duración exacta de cada paso, y las apaga al finalizar o al saltar. Si el controlador limita la cantidad de zonas simultáneas, configurá el **máximo de zonas simultáneas** en Ajustes.
+## 💧 Rain Bird
+La integración oficial de Rain Bird abre la zona con una duración por defecto. SK Irrigation Manager reconoce las entidades de la plataforma `rainbird` y usa `rainbird.start_irrigation` con la **duración exacta** de cada aspersor; además lo cierra al terminar o al saltarlo. Funciona con varios controladores a la vez (por ejemplo, 24 estaciones en 3 controladores). Si tu controlador limita la cantidad de zonas simultáneas, configurá el **máximo de aspersores simultáneos** en *Ajustes*.
 
-## Desarrollo
-- `dev/demo.html` es una demo del panel con un backend simulado (no requiere HA): `python3 -m http.server 8765` y abrí `http://localhost:8765/dev/demo.html`.
-- Tests: `pytest tests` (la lógica de calendario/planificación no depende de HA; los tests de integración usan `pytest-homeassistant-custom-component`).
+## ❓ Preguntas frecuentes
 
-## Licencia
-MIT © SK / SkynetCom
+<details><summary><b>¿Funciona con aspersores que no son Rain Bird?</b></summary>
+
+Sí: con cualquier entidad `switch`, `valve`, `input_boolean`, `light` o `fan` (OpenSprinkler, Shelly, Sonoff, ESPHome, Zigbee, Z-Wave, relés…).
+</details>
+
+<details><summary><b>¿Qué pasa si Home Assistant se reinicia en medio de un riego?</b></summary>
+
+Al volver, el módulo detecta que el riego quedó interrumpido y **cierra todas las válvulas** por seguridad. El ciclo no se retoma automáticamente.
+</details>
+
+<details><summary><b>¿Y si un aspersor no está disponible?</b></summary>
+
+Se saltea, queda registrado en el historial y la secuencia sigue con el siguiente.
+</details>
+
+<details><summary><b>¿Dos programas se pueden superponer?</b></summary>
+
+No se pisan: el segundo **espera en cola** o se **omite**, según lo que elijas en el programa.
+</details>
+
+<details><summary><b>No veo "Riego" en la barra lateral</b></summary>
+
+Asegurate de haber agregado la integración (paso 3 de la instalación) y recargá el navegador con Ctrl+F5. En la app móvil, cerrala y abrila de nuevo.
+</details>
+
+## 🛠️ Desarrollo
+
+```bash
+# Demo de la interfaz con backend simulado (no requiere Home Assistant)
+python3 -m http.server 8765   # y abrí http://localhost:8765/dev/demo.html
+
+# Tests: lógica pura + integración con un HA real (pytest-homeassistant-custom-component)
+pip install pytest-homeassistant-custom-component
+pytest tests
+```
+
+Estructura: `custom_components/sk_irrigation/` (motor, scheduler, API websocket, entidades), `frontend/` (panel web sin dependencias), `brand/` (íconos para HA 2026.3+), `tests/`, `dev/demo.html`.
+
+Historial de versiones en [CHANGELOG.md](CHANGELOG.md).
+
+## 📄 Licencia
+[MIT](LICENSE) © SK / SkynetCom
 
 ---
 
-## English
+## 🇬🇧 English
 
-**SK Irrigation Manager** is a Home Assistant integration with its own sidebar panel to manage irrigation professionally:
-drag & drop zone groups, programs with multiple start times per day (fixed, sunrise, sunset), weekday / every-N-days / month-day / odd / even / specific-date calendars with active months, per-step activation (sequential, 2, 3, 4, all or N sprinklers at once using a rolling queue), fixed or per-sprinkler durations, a Gantt preview, live dashboard, rain/weather/freeze skip conditions, water budget (global, per program or from a sensor such as Smart Irrigation), master valve/pump, global concurrency limit, history, notifications and JSON backup.
-Works with Rain Bird (exact durations through `rainbird.start_irrigation`) and any `switch`, `valve`, `input_boolean`, `light` or `fan` entity.
-Install through HACS as a custom repository (`https://github.com/SkynetCom/sk-irrigation-manager-ha`, category *Integration*), restart, then add the **SK Irrigation Manager** integration.
+**SK Irrigation Manager** is a Home Assistant integration with its own sidebar panel for professional irrigation management:
+
+- **Drag & drop** your HA devices (Rain Bird, switches, valves…) into groups, and groups into program sequences.
+- **Programs** with multiple start times per day (fixed, sunrise or sunset), weekdays, every N days, days of the month, odd or even days, specific dates and active months.
+- **Per-step activation**: sequential, or 2, 3, 4 or N sprinklers at once, using a rolling queue. **Same-for-all or per-sprinkler** durations, in a custom order.
+- **Smart conditions** (state, numeric or Jinja template), global or per program. They can optionally be **re-checked before each sprinkler and while watering**, which suits rain totals or solar/battery protection.
+- **Gantt preview**, live dashboard, water budget (global, per program or from a sensor such as Smart Irrigation), master valve or pump, global concurrency limit, history, notifications and JSON backup.
+- **Rain Bird native**: exact durations through `rainbird.start_irrigation`.
+
+**Install:** HACS → Custom repositories → `https://github.com/SkynetCom/sk-irrigation-manager-ha` (category *Integration*). Then restart and add the **SK Irrigation Manager** integration. The UI is available in Spanish and English and follows your HA language.
