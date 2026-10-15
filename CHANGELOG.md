@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.2 — sin publicar
+- Corregido: **"Custom element doesn't exist: sk-irrigation-…-card"** al abrir un dashboard mientras Home Assistant
+  arranca (por ejemplo, justo después de actualizar y reiniciar). Los archivos del panel se publican antes,
+  las tarjetas se registran también como **recurso de Lovelace** (versión actualizada automáticamente, sirve
+  también para Chromecast) y se cargan por una segunda URL de respaldo si la primera falló durante el arranque.
+
 ## 1.3.1 — 2026-10-15
 - Tarjetas Aspersores y Grupos: opción **Columnas** (vacío = automático) para controlar la disposición.
 - Los nombres largos en las tarjetas ocupan hasta 2 líneas en lugar de cortarse, con el nombre completo al pasar el mouse.

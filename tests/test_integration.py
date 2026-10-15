@@ -247,3 +247,22 @@ async def test_estimates_and_instant_condition_push(hass):
     hass.states.async_set("sensor.soc", "10")
     await asyncio.sleep(1.3)
     assert pushes and any("Battery" in r for r in pushes[-1][0:1])
+
+
+async def test_cards_registered_as_lovelace_resource(hass):
+    assert await async_setup_component(hass, "lovelace", {})
+    resources = hass.data["lovelace"].resources
+    await resources.async_load()
+    resources.loaded = True
+    # an outdated entry from a previous version gets its version bumped, not duplicated
+    await resources.async_create_item({"res_type": "module", "url": "/sk_irrigation_static/sk-irrigation-cards.js?v=0.0.1"})
+    entry, _ = await _setup(hass)
+    from custom_components.sk_irrigation import CARDS_URL
+    urls = [i["url"] for i in resources.async_items()]
+    assert urls == [CARDS_URL]
+    from custom_components.sk_irrigation import CARDS_GLOBAL_URL
+    assert CARDS_GLOBAL_URL in hass.data["frontend_extra_module_url"].urls
+    # deleting the integration removes the resource
+    await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+    assert [i["url"] for i in resources.async_items()] == []
