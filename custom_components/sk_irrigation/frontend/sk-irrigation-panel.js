@@ -936,7 +936,7 @@ class SkIrrigationPanel extends HTMLElement {
         ${pi + 1}. ${esc(ps.label)} <span class="muted">· ${conc}</span></div>`;
       sim.bars.filter((b) => b.step === pi).forEach((b) => {
         const secs = b.end - b.start;
-        html += `<div class="tl2-row"><span class="tl2-lab" title="${esc(b.name)}">${esc(b.name)}</span>
+        html += `<div class="tl2-row"><span class="tl2-lab" title="${esc(b.name)}"><span>${esc(b.name)}</span></span>
           <div class="tl2-track" style="${gridBg}">
             <div class="tl2-bar ${can ? "" : "ro"}" ${can ? `data-tl="move"` : ""} data-si="${ps.si}" data-z="${esc(b.zone_id)}" data-total="${total}"
               data-start="${b.start}" data-secs="${secs}" style="--c:${esc(b.color)};left:${pct(b.start)}%;width:${pct(secs)}%"

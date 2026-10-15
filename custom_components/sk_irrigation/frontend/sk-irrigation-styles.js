@@ -300,7 +300,9 @@ label.field > span { padding-left: 2px; }
 .tl2 { display: flex; flex-direction: column; gap: 4px; user-select: none; -webkit-user-select: none; }
 .tl2.zoomed { width: max-content; }
 .tl2.zoomed .tl2-row { grid-template-columns: 170px var(--tlw); }
-.tl2.zoomed .tl2-lab, .tl2.zoomed .tl2-step { position: sticky; left: 0; z-index: 2; background: var(--ski-card); }
+.tl2.zoomed .tl2-lab, .tl2.zoomed .tl2-row.axis > span:first-child, .tl2.zoomed .tl2-step {
+  position: sticky; left: 0; z-index: 4; background: var(--ski-card); }
+.tl2.zoomed .tl2-lab, .tl2.zoomed .tl2-row.axis > span:first-child { box-shadow: 8px 0 8px -8px rgba(0,0,0,.25); }
 .tl2.zoomed .tl2-step { width: max-content; padding-right: 12px; }
 .tl-zoom { margin-left: 4px; }
 .tl-zoom button { padding: 4px 8px; display: inline-flex; }
@@ -309,8 +311,11 @@ label.field > span { padding-left: 2px; }
 .tl2-step:first-child { margin-top: 0; }
 .tl2-step .muted { text-transform: none; letter-spacing: 0; font-weight: 500; }
 .tl2-step .dot { width: 9px; height: 9px; border-radius: 50%; }
-.tl2-row { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 10px; align-items: center; }
-.tl2-lab { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl2-row { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 0; align-items: stretch; }
+/* the label column is a full-height opaque cell so scrolled bars never show behind it */
+.tl2-lab { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center;
+  padding-right: 10px; min-width: 0; }
+.tl2-lab > span { overflow: hidden; text-overflow: ellipsis; }
 .tl2-track { position: relative; height: 30px; border-radius: 8px; background-color: rgba(127,127,127,.06);
   background-image: linear-gradient(to right, color-mix(in srgb, var(--ski-line) 100%, transparent) 1px, transparent 1px); }
 .tl2-bar { position: absolute; top: 3px; bottom: 3px; min-width: 8px; border-radius: 6px; background: var(--c); color: #fff;
