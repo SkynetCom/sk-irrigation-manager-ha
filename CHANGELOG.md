@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.2 — sin publicar
+## 1.3.2 — 2026-10-15
 - Corregido: **"Custom element doesn't exist: sk-irrigation-…-card"** al abrir un dashboard mientras Home Assistant
   arranca (por ejemplo, justo después de actualizar y reiniciar). Los archivos del panel se publican antes,
   las tarjetas se registran también como **recurso de Lovelace** (versión actualizada automáticamente, sirve
