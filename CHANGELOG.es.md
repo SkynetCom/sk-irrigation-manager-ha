@@ -2,7 +2,7 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
-## Sin publicar
+## 1.3.5 — 2026-10-16
 - Documentación en inglés como idioma principal (README, historial de cambios y capturas), con versión completa en español.
 - El título de la barra lateral de una instalación nueva y los nombres de las tarjetas en el selector siguen el idioma de Home Assistant ("Irrigation" / "Riego").
 

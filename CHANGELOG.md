@@ -2,7 +2,7 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
-## Unreleased
+## 1.3.5 — 2026-10-16
 - English is now the primary documentation language (README, changelog and screenshots), with a full Spanish version.
 - The sidebar title of a new install and the card names in the card picker follow the Home Assistant language ("Irrigation" / "Riego").
 
