@@ -15,13 +15,13 @@ from homeassistant.helpers.typing import ConfigType
 from .const import (
     CONF_REQUIRE_ADMIN,
     CONF_SIDEBAR_TITLE,
-    DEFAULT_SIDEBAR_TITLE,
     DOMAIN,
     PANEL_COMPONENT,
     PANEL_ICON,
     PANEL_URL_PATH,
     STATIC_URL,
     VERSION,
+    default_sidebar_title,
 )
 from .engine import IrrigationEngine
 from .services import async_register_services, async_unregister_services
@@ -88,7 +88,7 @@ async def _async_register_panel(hass: HomeAssistant, entry: ConfigEntry) -> None
         hass,
         frontend_url_path=PANEL_URL_PATH,
         webcomponent_name=PANEL_COMPONENT,
-        sidebar_title=options.get(CONF_SIDEBAR_TITLE, DEFAULT_SIDEBAR_TITLE),
+        sidebar_title=options.get(CONF_SIDEBAR_TITLE) or default_sidebar_title(hass.config.language),
         sidebar_icon=PANEL_ICON,
         module_url=f"{STATIC_URL}/sk-irrigation-panel.js?v={VERSION}",
         embed_iframe=False,

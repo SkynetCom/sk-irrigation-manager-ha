@@ -15,7 +15,12 @@ STATIC_URL = "/sk_irrigation_static"
 
 CONF_SIDEBAR_TITLE = "sidebar_title"
 CONF_REQUIRE_ADMIN = "require_admin"
-DEFAULT_SIDEBAR_TITLE = "Riego"
+DEFAULT_SIDEBAR_TITLE = "Irrigation"
+
+
+def default_sidebar_title(language: str | None) -> str:
+    """Sidebar title for a new install, in the Home Assistant language."""
+    return "Riego" if (language or "").startswith("es") else DEFAULT_SIDEBAR_TITLE
 
 SIGNAL_UPDATE = f"{DOMAIN}_update"
 SIGNAL_PROGRAMS_CHANGED = f"{DOMAIN}_programs_changed"

@@ -42,6 +42,8 @@
 <script type="module">
 import "../custom_components/sk_irrigation/frontend/sk-irrigation-panel.js";
 
+// Mock data follows the demo language (?lang=en) so screenshots stay consistent.
+const L = (es, en) => (new URLSearchParams(location.search).get("lang") === "en" ? en : es);
 const SPEED = 30; // demo time runs 30x faster
 const pad = (n) => String(n).padStart(2, "0");
 const iso = (ms) => new Date(ms).toISOString();
@@ -50,36 +52,36 @@ const candidates = [];
 for (let i = 1; i <= 8; i++) {
   const id = `switch.rainbird_sprinkler_${i}`;
   states[id] = { entity_id: id, state: "off", attributes: { friendly_name: `Rain Bird Sprinkler ${i}` } };
-  const area = i <= 2 ? "Jardín frontal" : i <= 4 ? "Laterales" : "Fondo";
+  const area = i <= 2 ? L("Jardín frontal", "Front yard") : i <= 4 ? L("Laterales", "Sides") : L("Fondo", "Backyard");
   candidates.push({ entity_id: id, name: `Rain Bird Sprinkler ${i}`, domain: "switch", platform: "rainbird", area });
 }
-for (const [id, name] of [["valve.goteo_huerta", "Goteo huerta"], ["switch.bomba_pozo", "Bomba pozo"]]) {
+for (const [id, name] of [["valve.goteo_huerta", L("Goteo huerta", "Garden drip")], ["switch.bomba_pozo", L("Bomba pozo", "Well pump")]]) {
   states[id] = { entity_id: id, state: "off", attributes: { friendly_name: name } };
-  candidates.push({ entity_id: id, name, domain: id.split(".")[0], platform: "demo", area: id.includes("huerta") ? "Huerta" : null });
+  candidates.push({ entity_id: id, name, domain: id.split(".")[0], platform: "demo", area: id.includes("huerta") ? L("Huerta", "Vegetable garden") : null });
 }
-states["binary_sensor.rain"] = { entity_id: "binary_sensor.rain", state: "off", attributes: { friendly_name: "Sensor de lluvia" } };
-states["weather.home"] = { entity_id: "weather.home", state: "sunny", attributes: { friendly_name: "Clima casa" } };
-for (const [id, v, n] of [["sensor.the_ark_sensors_precipitation_description", "no_rain", "Descripción de lluvia"],
-  ["sensor.the_ark_sensors_precipitation_today", "0.4", "Lluvia hoy (mm)"], ["sensor.the_ark_sensors_precipitation_yesterday", "1.8", "Lluvia ayer (mm)"],
-  ["sensor.solark_total_grid_power", "0", "Potencia red/generador (W)"], ["sensor.solark_system_soc", "64", "Batería (%)"]]) {
+states["binary_sensor.rain"] = { entity_id: "binary_sensor.rain", state: "off", attributes: { friendly_name: L("Sensor de lluvia", "Rain sensor") } };
+states["weather.home"] = { entity_id: "weather.home", state: "sunny", attributes: { friendly_name: L("Clima casa", "Home weather") } };
+for (const [id, v, n] of [["sensor.the_ark_sensors_precipitation_description", "no_rain", L("Descripción de lluvia", "Precipitation description")],
+  ["sensor.the_ark_sensors_precipitation_today", "0.4", L("Lluvia hoy (mm)", "Rain today (mm)")], ["sensor.the_ark_sensors_precipitation_yesterday", "1.8", L("Lluvia ayer (mm)", "Rain yesterday (mm)")],
+  ["sensor.solark_total_grid_power", "0", L("Potencia red/generador (W)", "Grid/generator power (W)")], ["sensor.solark_system_soc", "64", L("Batería (%)", "Battery (%)")]]) {
   states[id] = { entity_id: id, state: v, attributes: { friendly_name: n } };
 }
-states["sensor.temp_ext"] = { entity_id: "sensor.temp_ext", state: "14", attributes: { friendly_name: "Temperatura exterior" } };
+states["sensor.temp_ext"] = { entity_id: "sensor.temp_ext", state: "14", attributes: { friendly_name: L("Temperatura exterior", "Outdoor temperature") } };
 
 const C = ["#2e9e6b", "#1e88e5", "#f2a900", "#e5533d", "#8e44ad", "#00a6a6"];
 const config = {
   zones: [
-    ["Césped frente", 1], ["Cantero entrada", 2], ["Lateral izquierdo", 3], ["Lateral derecho", 4],
-    ["Fondo césped", 5], ["Fondo canteros", 6], ["Pileta", 7],
+    [L("Césped frente", "Front lawn"), 1], [L("Cantero entrada", "Entrance bed"), 2], [L("Lateral izquierdo", "Left side"), 3], [L("Lateral derecho", "Right side"), 4],
+    [L("Fondo césped", "Back lawn"), 5], [L("Fondo canteros", "Back beds"), 6], [L("Pileta", "Pool"), 7],
   ].map(([name, i], k) => ({ id: `zone_${i}`, name, entity_id: `switch.rainbird_sprinkler_${i}`, icon: "mdi:sprinkler",
     color: C[k % C.length], enabled: true, flow_rate: 12 + k * 2, notes: "" })),
   groups: [
-    { id: "group_front", name: "Jardín frontal", color: "#2e9e6b", icon: "mdi:sprinkler-variant", zone_ids: ["zone_1", "zone_2"] },
-    { id: "group_sides", name: "Laterales", color: "#1e88e5", icon: "mdi:sprinkler-variant", zone_ids: ["zone_3", "zone_4"] },
-    { id: "group_back", name: "Fondo", color: "#f2a900", icon: "mdi:sprinkler-variant", zone_ids: ["zone_5", "zone_6", "zone_7"] },
+    { id: "group_front", name: L("Jardín frontal", "Front yard"), color: "#2e9e6b", icon: "mdi:sprinkler-variant", zone_ids: ["zone_1", "zone_2"] },
+    { id: "group_sides", name: L("Laterales", "Sides"), color: "#1e88e5", icon: "mdi:sprinkler-variant", zone_ids: ["zone_3", "zone_4"] },
+    { id: "group_back", name: L("Fondo", "Backyard"), color: "#f2a900", icon: "mdi:sprinkler-variant", zone_ids: ["zone_5", "zone_6", "zone_7"] },
   ],
   programs: [
-    { id: "prog_morning", name: "Riego mañana", color: "#2e9e6b", enabled: true,
+    { id: "prog_morning", name: L("Riego mañana", "Morning watering"), color: "#2e9e6b", enabled: true,
       schedule: { mode: "weekdays", weekdays: [0, 2, 4], interval_days: 2, anchor_date: "2026-10-01", month_days: [], dates: [], months: [] },
       start_times: [{ type: "fixed", time: "06:00" }, { type: "sunset", offset: 30 }],
       steps: [
@@ -88,7 +90,7 @@ const config = {
         { id: "s3", group_id: "group_back", concurrency: 2, duration_mode: "custom", duration: 10, durations: { zone_5: 15, zone_6: 6, zone_7: 10 } },
       ],
       budget: 100, zone_delay_s: -1, step_delay_s: -1, ignore_conditions: false, on_busy: "queue" },
-    { id: "prog_summer", name: "Refuerzo verano", color: "#e5533d", enabled: false,
+    { id: "prog_summer", name: L("Refuerzo verano", "Summer boost"), color: "#e5533d", enabled: false,
       schedule: { mode: "interval", weekdays: [], interval_days: 3, anchor_date: "2026-10-01", month_days: [], dates: [], months: [12, 1, 2] },
       start_times: [{ type: "fixed", time: "21:30" }],
       steps: [{ id: "s4", group_id: "group_back", concurrency: 0, duration_mode: "uniform", duration: 5, durations: {} }],
@@ -99,20 +101,20 @@ const config = {
     freeze_threshold: 3, budget_entity: null, global_budget: 100, master_entity: "switch.bomba_pozo", master_lead_s: 3,
     master_lag_s: 3, max_concurrent: 0, zone_delay_s: 5, step_delay_s: 10, max_zone_minutes: 120, history_size: 60, notify_service: null, manual_conditions: true,
     conditions: [
-      { id: "c1", type: "state", label: "No está lloviendo", entity_id: "sensor.the_ark_sensors_precipitation_description", attribute: null, operator: "is", states: ["no_rain"], above: null, below: null, template: "", recheck: false, unavailable: "fail" },
-      { id: "c2", type: "numeric", label: "Lluvia hoy < 5 mm", entity_id: "sensor.the_ark_sensors_precipitation_today", attribute: null, operator: "is", states: [], above: null, below: 5, template: "", recheck: false, unavailable: "pass" },
-      { id: "c3", type: "numeric", label: "Lluvia ayer < 5 mm", entity_id: "sensor.the_ark_sensors_precipitation_yesterday", attribute: null, operator: "is", states: [], above: null, below: 5, template: "", recheck: false, unavailable: "pass" },
-      { id: "c4", type: "numeric", label: "Generador apagado (< 50 W)", entity_id: "sensor.solark_total_grid_power", attribute: null, operator: "is", states: [], above: null, below: 50, template: "", recheck: true, unavailable: "fail" },
-      { id: "c5", type: "numeric", label: "Batería > 20 %", entity_id: "sensor.solark_system_soc", attribute: null, operator: "is", states: [], above: 20, below: null, template: "", recheck: true, unavailable: "fail" },
+      { id: "c1", type: "state", label: L("No está lloviendo", "Not raining"), entity_id: "sensor.the_ark_sensors_precipitation_description", attribute: null, operator: "is", states: ["no_rain"], above: null, below: null, template: "", recheck: false, unavailable: "fail" },
+      { id: "c2", type: "numeric", label: L("Lluvia hoy < 5 mm", "Rain today < 5 mm"), entity_id: "sensor.the_ark_sensors_precipitation_today", attribute: null, operator: "is", states: [], above: null, below: 5, template: "", recheck: false, unavailable: "pass" },
+      { id: "c3", type: "numeric", label: L("Lluvia ayer < 5 mm", "Rain yesterday < 5 mm"), entity_id: "sensor.the_ark_sensors_precipitation_yesterday", attribute: null, operator: "is", states: [], above: null, below: 5, template: "", recheck: false, unavailable: "pass" },
+      { id: "c4", type: "numeric", label: L("Generador apagado (< 50 W)", "Generator off (< 50 W)"), entity_id: "sensor.solark_total_grid_power", attribute: null, operator: "is", states: [], above: null, below: 50, template: "", recheck: true, unavailable: "fail" },
+      { id: "c5", type: "numeric", label: L("Batería > 20 %", "Battery > 20 %"), entity_id: "sensor.solark_system_soc", attribute: null, operator: "is", states: [], above: 20, below: null, template: "", recheck: true, unavailable: "fail" },
     ] },
 };
 let current = null;
 const queue = [];
 const history = [
-  { id: "h1", name: "Riego mañana", program_id: "prog_morning", source: "schedule", status: "completed", reason: "",
+  { id: "h1", name: L("Riego mañana", "Morning watering"), program_id: "prog_morning", source: "schedule", status: "completed", reason: "",
     start: iso(Date.now() - 86400000), end: iso(Date.now() - 86400000 + 2700000),
     zones: config.zones.slice(0, 5).map((z) => ({ zone_id: z.id, seconds: 600 })) },
-  { id: "h2", name: "Riego mañana", program_id: "prog_morning", source: "schedule", status: "skipped", reason: "rain_sensor:binary_sensor.rain",
+  { id: "h2", name: L("Riego mañana", "Morning watering"), program_id: "prog_morning", source: "schedule", status: "skipped", reason: "rain_sensor:binary_sensor.rain",
     start: iso(Date.now() - 3 * 86400000), end: iso(Date.now() - 3 * 86400000), zones: [] },
 ];
 const zoneStats = { zone_1: { last: iso(Date.now() - 86400000), last_seconds: 720 } };

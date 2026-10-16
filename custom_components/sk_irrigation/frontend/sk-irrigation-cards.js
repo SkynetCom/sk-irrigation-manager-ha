@@ -438,18 +438,27 @@ class SkZonesCard extends SkBaseCard {
   }
 }
 
-const CARDS = [
+// The card picker is built before the cards get `hass`, so follow the page language.
+const PICKER_ES = (document.documentElement.lang || navigator.language || "").startsWith("es");
+const CARDS = PICKER_ES ? [
   ["sk-irrigation-status-card", SkStatusCard, "SK Riego · Estado", "Riego en curso, próximo riego, condiciones y controles rápidos."],
   ["sk-irrigation-programs-card", SkProgramsCard, "SK Riego · Ciclos", "Programas/ciclos con próximo riego, duración, activar y regar ahora."],
   ["sk-irrigation-groups-card", SkGroupsCard, "SK Riego · Grupos", "Grupos con sus aspersores en vivo y riego rápido del grupo."],
   ["sk-irrigation-zones-card", SkZonesCard, "SK Riego · Aspersores", "Grilla de aspersores con estado en vivo y riego manual."],
+] : [
+  ["sk-irrigation-status-card", SkStatusCard, "SK Irrigation · Status", "Current run, next run, conditions and quick controls."],
+  ["sk-irrigation-programs-card", SkProgramsCard, "SK Irrigation · Programs", "Programs/cycles with next run, duration, enable and run now."],
+  ["sk-irrigation-groups-card", SkGroupsCard, "SK Irrigation · Groups", "Groups with their live sprinklers and quick group watering."],
+  ["sk-irrigation-zones-card", SkZonesCard, "SK Irrigation · Sprinklers", "Sprinkler grid with live state and manual watering."],
 ];
 window.customCards = window.customCards || [];
 for (const [tag, cls, name, description] of CARDS) {
   if (!customElements.get(tag)) customElements.define(tag, cls);
   if (!window.customCards.some((c) => c.type === tag)) {
     window.customCards.push({ type: tag, name, description, preview: true,
-      documentationURL: "https://github.com/SkynetCom/sk-irrigation-manager-ha#-tarjetas-para-dashboards" });
+      documentationURL: PICKER_ES
+        ? "https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/README.es.md#-tarjetas-para-dashboards"
+        : "https://github.com/SkynetCom/sk-irrigation-manager-ha#-dashboard-cards" });
   }
 }
 console.info(`%c SK-IRRIGATION-CARDS %c ${CARD_VERSION} `, "background:#1257c4;color:#fff;font-weight:700", "background:#2e9e6b;color:#fff");

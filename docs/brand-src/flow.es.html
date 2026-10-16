@@ -1,0 +1,35 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+  html,body{margin:0;width:1680px;height:420px;overflow:hidden;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;background:transparent}
+  .wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:0;padding:0 30px}
+  .node{width:250px;border-radius:22px;padding:26px 22px;color:#fff;box-shadow:0 14px 34px rgba(16,40,80,.22);text-align:center}
+  .node .ic{font-size:44px;line-height:1}
+  .node h3{margin:12px 0 6px;font-size:27px;letter-spacing:-.3px}
+  .node p{margin:0;font-size:17px;line-height:1.35;opacity:.92}
+  .a{background:linear-gradient(135deg,#1fb6e8,#1565c0)}
+  .b{background:linear-gradient(135deg,#3fcf7e,#1c9a5a)}
+  .c{background:linear-gradient(135deg,#f6b93b,#e08a00)}
+  .d{background:linear-gradient(135deg,#7b61ff,#4b2fd6)}
+  .arrow{width:96px;white-space:nowrap;display:flex;flex-direction:column;align-items:center;color:#5b6b7f;font-size:14px;font-weight:600;gap:4px}
+  .arrow svg{width:64px;height:24px}
+  .split{display:flex;flex-direction:column;gap:18px}
+  .small{width:230px;padding:16px 18px;border-radius:18px;display:flex;align-items:center;gap:14px;text-align:left;color:#fff;box-shadow:0 10px 26px rgba(16,40,80,.2)}
+  .small .ic{font-size:32px}
+  .small h4{margin:0;font-size:21px}
+  .small p{margin:2px 0 0;font-size:15px;opacity:.92}
+  .ok{background:linear-gradient(135deg,#1fb6e8,#0f86c9)}
+  .skip{background:linear-gradient(135deg,#8796a8,#5d6b7c)}
+</style></head><body><div class="wrap">
+  <div class="node a"><div class="ic">🔌</div><h3>Aspersores</h3><p>Tus dispositivos de HA<br>Rain Bird · switch · valve</p></div>
+  <div class="arrow"><svg viewBox="0 0 64 24"><path d="M2 12h54M46 4l12 8-12 8" fill="none" stroke="#8796a8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>drag &amp; drop</div>
+  <div class="node b"><div class="ic">🗂️</div><h3>Grupos</h3><p>Frente · Laterales · Fondo<br>o por área de HA</p></div>
+  <div class="arrow"><svg viewBox="0 0 64 24"><path d="M2 12h54M46 4l12 8-12 8" fill="none" stroke="#8796a8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>drag &amp; drop</div>
+  <div class="node c"><div class="ic">🗓️</div><h3>Programas</h3><p>Días · horarios · orden<br>tiempos · condiciones</p></div>
+  <div class="arrow"><svg viewBox="0 0 64 24"><path d="M2 12h54M46 4l12 8-12 8" fill="none" stroke="#8796a8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <div class="node d" style="width:210px"><div class="ic">✅</div><h3>¿Condiciones OK?</h3><p>lluvia · clima<br>energía · plantillas</p></div>
+  <div class="arrow"><svg viewBox="0 0 64 24"><path d="M2 12h54M46 4l12 8-12 8" fill="none" stroke="#8796a8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <div class="split">
+    <div class="small ok"><div class="ic">💧</div><div><h4>Sí: riega</h4><p>secuencial o N a la vez</p></div></div>
+    <div class="small skip"><div class="ic">⏭️</div><div><h4>No: se omite</h4><p>y queda en el historial</p></div></div>
+  </div>
+</div></body></html>
