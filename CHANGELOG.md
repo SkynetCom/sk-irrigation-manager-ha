@@ -1,5 +1,9 @@
 # Changelog
 
+## Sin publicar
+- Corregido: si el editor de un programa estaba abierto al **importar una configuración**, seguía mostrando
+  (y podía volver a guardar) los tiempos viejos. Ahora el editor se actualiza con lo importado.
+
 ## 1.3.3 — 2026-10-15
 - Disponible en todos los países en HACS: se quita la restricción `country` de `hacs.json`.
 

@@ -186,11 +186,21 @@ class SkIrrigationPanel extends HTMLElement {
     this._skew = Date.parse(state.now) - Date.now();
   }
 
+  // An open program editor keeps its own copy: refresh it when the stored
+  // configuration changes underneath it (import, another browser), unless
+  // the user has unsaved edits. ``force`` also drops unsaved edits.
+  _syncEdit(force = false) {
+    if (!this._edit || (this._dirty && !force)) return;
+    const fresh = (this._config?.programs || []).find((x) => x.id === this._edit.id);
+    this._edit = fresh ? clone(fresh) : null;
+    this._dirty = false;
+  }
+
   _onPush(msg) {
     const prevStatus = this._state?.status;
     const prevRun = this._state?.current?.id;
     const prevActive = (this._state?.current?.active || []).map((a) => a.zone_id).join();
-    if (msg.config && !Object.keys(this._saveTimers).length) this._config = msg.config;
+    if (msg.config && !Object.keys(this._saveTimers).length) { this._config = msg.config; this._syncEdit(); }
     if (msg.state) this._setState(msg.state);
     if (this._drag || this._dialog) { this._renderToolbar(); return; }
     const activeNow = (this._state?.current?.active || []).map((a) => a.zone_id).join();
@@ -1854,6 +1864,7 @@ class SkIrrigationPanel extends HTMLElement {
           const parsed = JSON.parse(text);
           const res = await this._ws({ type: `${DOMAIN}/import`, config: parsed.config || parsed });
           this._config = res.config;
+          this._syncEdit(true);
           this._toast(this.t("imported"));
           this._render();
         });
