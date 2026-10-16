@@ -9,12 +9,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/SkynetCom/sk-irrigation-manager-ha/releases"><img src="https://img.shields.io/github/v/release/SkynetCom/sk-irrigation-manager-ha?include_prereleases&label=versi%C3%B3n&color=1e88e5" alt="Versión"></a>
+  <a href="https://github.com/SkynetCom/sk-irrigation-manager-ha/releases"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FSkynetCom%2Fsk-irrigation-manager-ha%2Fmain%2Fcustom_components%2Fsk_irrigation%2Fmanifest.json&query=%24.version&prefix=v&label=versi%C3%B3n&color=1e88e5&cacheSeconds=3600" alt="Versión"></a>
   <a href="https://hacs.xyz/docs/faq/custom_repositories"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS"></a>
   <img src="https://img.shields.io/badge/Home%20Assistant-2024.11%2B-18bcf2?logo=homeassistant&logoColor=white" alt="Home Assistant">
   <a href="https://github.com/SkynetCom/sk-irrigation-manager-ha/actions/workflows/validate.yml"><img src="https://github.com/SkynetCom/sk-irrigation-manager-ha/actions/workflows/validate.yml/badge.svg" alt="Validate"></a>
   <img src="https://img.shields.io/badge/idiomas-ES%20%7C%20EN-2e9e6b" alt="Idiomas">
-  <a href="https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/LICENSE"><img src="https://img.shields.io/github/license/SkynetCom/sk-irrigation-manager-ha?color=8e44ad" alt="Licencia"></a>
+  <a href="https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/LICENSE"><img src="https://img.shields.io/badge/licencia-MIT-8e44ad" alt="Licencia"></a>
 </p>
 
 <p align="center">
