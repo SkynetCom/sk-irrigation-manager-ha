@@ -1,6 +1,6 @@
 # Changelog
 
-## Sin publicar
+## 1.3.4 — 2026-10-16
 - Corregido: si el editor de un programa estaba abierto al **importar una configuración**, seguía mostrando
   (y podía volver a guardar) los tiempos viejos. Ahora el editor se actualiza con lo importado.
 
