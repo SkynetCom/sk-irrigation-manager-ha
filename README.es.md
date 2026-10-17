@@ -68,6 +68,14 @@ Válvula maestra o bomba, límite hidráulico de aspersores simultáneos, tiempo
 
 </td>
 </tr>
+<tr>
+<td colspan="3" valign="top">
+
+### 🗺️ Mapa en vivo
+Dibujá el área de cada aspersor sobre tu **foto de dron, plano o imagen satelital** y mirá el predio en vivo: el área activa se ilumina con ondas y muestra hace cuánto está regando, el próximo aparece remarcado y el mapa sigue el ciclo de un controlador al siguiente. [Ver la sección Mapa ↓](#%EF%B8%8F-mapa)
+
+</td>
+</tr>
 </table>
 
 ## 🧭 Cómo funciona

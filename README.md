@@ -68,6 +68,14 @@ Master valve or pump, a hydraulic limit on simultaneous sprinklers, a maximum ti
 
 </td>
 </tr>
+<tr>
+<td colspan="3" valign="top">
+
+### 🗺️ Live map
+Draw each sprinkler's area on your **drone photo, site plan or satellite imagery** and watch the property live: the active area ripples and shows how long it has been watering, the next one is outlined, and the map follows the cycle from one controller to the next. [See the Map section ↓](#%EF%B8%8F-map)
+
+</td>
+</tr>
 </table>
 
 ## 🧭 How it works
