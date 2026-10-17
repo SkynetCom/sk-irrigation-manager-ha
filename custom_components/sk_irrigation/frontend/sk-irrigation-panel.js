@@ -94,7 +94,10 @@ class SkIrrigationPanel extends HTMLElement {
     this._search = "";
     this._domain = "suggested";
     this._skew = 0;
-    try { this._mapId = localStorage.getItem("ski-map"); } catch (e) { /* ignore */ }
+    try {
+      this._mapId = localStorage.getItem("ski-map");
+      this._mapFollow = localStorage.getItem("ski-map-follow") !== "0";
+    } catch (e) { /* ignore */ }
     const sr = this.shadowRoot;
     sr.addEventListener("click", (e) => this._onClick(e));
     sr.addEventListener("change", (e) => this._onChange(e));
@@ -218,7 +221,10 @@ class SkIrrigationPanel extends HTMLElement {
       if (structural || msg.config || this._tab !== "dashboard") this._render();
     }
     if (this._tab === "map") {
-      if (structural) this._render();
+      // own key: the side list must follow every sprinkler change of the run
+      const cur = this._state?.current;
+      const runKey = cur ? `${cur.id}|${cur.active.map((x) => x.zone_id).join()}|${cur.done.length}` : this._state?.status;
+      if (structural || runKey !== this._mapRunKey) { this._mapRunKey = runKey; this._render(); }
       else this._mapRefresh();
     }
     this._renderToolbar();

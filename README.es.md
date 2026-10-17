@@ -93,7 +93,7 @@ Subí una **foto de dron o un plano** de tu terreno (o usá la vista **satelital
 
 <p align="center"><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/map.es.png" alt="Pestaña Mapa" width="100%"></p>
 
-- **Varios mapas**, por ejemplo uno por controlador y una vista satelital de todo el predio.
+- **Varios mapas**, por ejemplo uno por controlador y una vista satelital de todo el predio. Con **Seguir riego** activado, el mapa cambia y se mueve solo cuando un ciclo salta de un controlador o de un rincón del terreno a otro.
 - **Arrastrá** un aspersor de la lista al mapa y ajustá su contorno: mové las esquinas, arrastrá los puntos intermedios para sumar esquinas, doble clic en una esquina para borrarla y ✥ para mover toda el área.
 - Un aspersor puede tener **varias áreas separadas** (dos franjas de césped, un cantero a cada lado…); se encienden todas juntas.
 - Los mapas son parte de tu configuración: **Ajustes → Respaldo** los exporta con sus imágenes, y un archivo que solo trae mapas se **agrega** a la configuración actual en lugar de reemplazarla.

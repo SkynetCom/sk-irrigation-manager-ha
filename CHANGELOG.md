@@ -6,6 +6,8 @@
 - New **Map** tab: draw each sprinkler's area on a drone photo / site plan or on satellite imagery and see live which one is
   watering (ripple animation, elapsed and remaining time), which one is next and which ones already ran. Several maps (for
   example one per controller), several areas per sprinkler, drag & drop placement, vertex editing and quick watering from the map.
+- **Follow watering** (on by default): when a cycle jumps to a sprinkler on another map (for example, from one controller
+  to the next) the map switches on its own and pans to the active area. The cycle list shows which map each sprinkler is on.
 - Backup: exports include map images; importing a file that only contains maps adds them to the current configuration.
 - Uploaded images are stored in `config/sk_irrigation/maps/` and deleted when no map uses them.
 

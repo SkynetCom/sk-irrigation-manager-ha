@@ -14,6 +14,7 @@ const MAX_IMAGE_SIDE = 4096;
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const attr = (o) => esc(JSON.stringify(o));
 const clone = (o) => JSON.parse(JSON.stringify(o));
+const dur = (sec) => (sec < 60 ? `${Math.round(sec)} s` : `${Math.round(sec / 60)} min`);
 const uid = (p) => `${p}_${Math.random().toString(16).slice(2, 10)}`;
 
 let leafletPromise = null;
@@ -151,6 +152,8 @@ export const MapMixin = {
           <div class="chips">${chips}
             ${can ? `<button class="chip add" data-action="map-new" data-kind="image" title="${this.t("map_add")}"><ha-icon icon="mdi:plus" style="--mdc-icon-size:16px"></ha-icon>${this.t("map_add")}</button>` : ""}</div>
           <span class="spacer"></span>
+          ${!editing ? `<button class="chip ${this._mapFollow === false ? "" : "on"}" data-action="map-follow" title="${this.t("map_follow_tip")}">
+            <ha-icon icon="mdi:crosshairs-gps" style="--mdc-icon-size:16px"></ha-icon>${this.t("map_follow")}</button>` : ""}
           ${can ? `<button class="btn sm ${editing ? "primary" : ""}" data-action="map-edit"><ha-icon icon="${editing ? "mdi:check" : "mdi:vector-polygon"}"></ha-icon>${editing ? this.t("map_done") : this.t("map_edit")}</button>` : ""}
         </div>
         ${editing ? `<div class="map-hint">${this.t("map_edit_hint")}</div>` : ""}
@@ -226,10 +229,13 @@ export const MapMixin = {
         const s = states[o.zone_id] || {};
         const z = zones[o.zone_id];
         const right = s.st === "on" ? `<span class="tnum" data-start="${s.started}" data-end="${s.ends}" data-mode="clock"></span>`
-          : s.st === "done" ? `✓ ${Math.round(o.seconds / 60)} min` : `${Math.round(o.seconds / 60)} min`;
-        return `<div class="run-row ${s.st}" ${onMap.has(o.zone_id) ? `data-action="map-focus" data-id="${o.zone_id}"` : ""}>
+          : s.st === "done" ? `✓ ${dur(o.seconds)}` : dur(o.seconds);
+        const other = onMap.has(o.zone_id) ? null : this._maps.find((m) => m.shapes?.[o.zone_id]);
+        const go = onMap.has(o.zone_id) || other;
+        return `<div class="run-row ${s.st}" ${go ? `data-action="map-goto" data-id="${o.zone_id}"` : ""}>
           <span class="n">${i + 1}</span><span class="nm">${esc(z?.name || o.zone_id)}</span>
-          ${onMap.has(o.zone_id) ? "" : `<ha-icon icon="mdi:map-marker-off-outline" title="${this.t("map_not_on_map")}" style="--mdc-icon-size:15px;color:var(--ski-muted)"></ha-icon>`}
+          ${onMap.has(o.zone_id) ? "" : other ? `<span class="map-tag">${esc(other.name)}</span>`
+            : `<ha-icon icon="mdi:map-marker-off-outline" title="${this.t("map_not_on_map")}" style="--mdc-icon-size:15px;color:var(--ski-muted)"></ha-icon>`}
           <span class="t">${right}</span></div>`;
       }).join("")}</div></div>`;
   },
@@ -355,6 +361,11 @@ export const MapMixin = {
     });
     this._mapRefresh(true);
     if (editing && this._mapSel) this._mapShowHandles();
+    if (this._mapFocusPending && this._mapLayers[this._mapFocusPending]) {
+      const zid = this._mapFocusPending;
+      this._mapFocusPending = null;
+      setTimeout(() => this._mapFocus(zid), 120);
+    }
   },
 
   // live classes, badges and ripples, without rebuilding the map
@@ -363,6 +374,7 @@ export const MapMixin = {
     const L = this._L;
     const states = this._mapZoneStates();
     const editing = this._mapEdit && this._can();
+    if (!editing && this._mapFollowActive(states)) return;
     Object.entries(this._mapLayers).forEach(([zid, ly]) => {
       const st = states[zid]?.st || "idle";
       ly.parts.forEach((p) => {
@@ -396,6 +408,39 @@ export const MapMixin = {
       this._mapLive.push(badge);
     });
     this._tick();
+  },
+
+  // "Follow watering": a cycle often jumps from one controller (map) to another
+  // and across the property, so keep the active sprinkler on screen. Picking
+  // another map by hand pauses this until the active sprinkler changes.
+  _mapFollowActive(states) {
+    if (this._mapFollow === false) return false;
+    const active = Object.keys(states).filter((z) => states[z].st === "on");
+    const key = active.join();
+    if (this._mapFollowPausedFor !== undefined) {
+      if (this._mapFollowPausedFor === key) return false;
+      this._mapFollowPausedFor = undefined;
+    }
+    if (!active.length) { this._mapFollowKey = key; return false; }
+    const view = this._mapView();
+    if (!active.some((z) => view?.shapes?.[z])) {
+      const target = this._maps.find((m) => active.some((z) => m.shapes?.[z]));
+      if (target && target.id !== view?.id) {
+        this._mapId = target.id;
+        this._mapFollowKey = key;
+        this._mapFocusPending = active.find((z) => target.shapes[z]);
+        setTimeout(() => this._render(), 0);
+        return true;
+      }
+      return false;
+    }
+    if (key !== this._mapFollowKey) {
+      this._mapFollowKey = key;
+      const zid = active.find((z) => this._mapLayers?.[z]);
+      const ly = zid && this._mapLayers[zid];
+      if (ly && this._lmap && !this._lmap.getBounds().contains(ly.parts[0].getBounds())) this._lmap.panTo(ly.center);
+    }
+    return false;
   },
 
   // ------------------------------------------------------------ interaction
@@ -539,6 +584,7 @@ export const MapMixin = {
     switch (a) {
       case "map-view":
         this._mapId = id; this._mapSel = null; this._mapPlacing = null;
+        this._mapFollowPausedFor = Object.entries(this._mapZoneStates()).filter(([, st]) => st.st === "on").map(([z]) => z).join();
         try { localStorage.setItem("ski-map", id); } catch (err) { /* ignore */ }
         break;
       case "map-new": {
@@ -603,6 +649,21 @@ export const MapMixin = {
         break;
       }
       case "map-focus": this._mapFocus(id); return;
+      case "map-goto": {
+        const target = this._maps.find((m) => m.shapes?.[id]);
+        if (!target) return;
+        if (target.id === view?.id) { this._mapFocus(id); return; }
+        this._mapId = target.id;
+        this._mapFocusPending = id;
+        this._mapFollowPausedFor = Object.entries(this._mapZoneStates()).filter(([, st]) => st.st === "on").map(([z]) => z).join();
+        break;
+      }
+      case "map-follow":
+        this._mapFollow = this._mapFollow === false;
+        this._mapFollowPausedFor = undefined;
+        this._mapFollowKey = null;
+        try { localStorage.setItem("ski-map-follow", this._mapFollow ? "1" : "0"); } catch (err) { /* ignore */ }
+        break;
       default: return;
     }
     this._render();

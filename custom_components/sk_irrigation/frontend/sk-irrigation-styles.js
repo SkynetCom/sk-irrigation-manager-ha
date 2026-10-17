@@ -399,6 +399,7 @@ div.field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; co
 .run-row .n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: rgba(127,127,127,.12); color: var(--ski-muted); flex: none; }
 .run-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .run-row .t { color: var(--ski-muted); font-variant-numeric: tabular-nums; }
+.map-tag { font-size: 11px; padding: 1px 7px; border-radius: 99px; background: rgba(127,127,127,.12); color: var(--ski-muted); white-space: nowrap; }
 .run-row.on { background: color-mix(in srgb, var(--ski-green) 12%, transparent); }
 .run-row.on .n { background: var(--ski-green); color: #fff; }
 .run-row.on .t { color: var(--ski-green); font-weight: 700; }

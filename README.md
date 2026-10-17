@@ -93,7 +93,7 @@ Upload a top-down **drone photo or a site plan** (or use **satellite** imagery),
 
 <p align="center"><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/map.png" alt="Map tab" width="100%"></p>
 
-- **Several maps**, for example one per controller plus a satellite view of the whole property.
+- **Several maps**, for example one per controller plus a satellite view of the whole property. With **Follow watering** on, the map switches and pans on its own when a cycle jumps from one controller or corner of the property to another.
 - **Drag & drop** a sprinkler from the list onto the map, then adjust its outline: move the corners, drag the small midpoints to add corners, double-click a corner to delete it and use ✥ to move the whole area.
 - A sprinkler can have **several separate areas** (two strips of lawn, a bed on each side…); all of them light up together.
 - Maps are part of your configuration: **Settings → Backup** exports them with their images, and a file that only contains maps is **added** to the current configuration instead of replacing it.

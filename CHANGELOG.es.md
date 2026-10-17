@@ -6,6 +6,8 @@
 - Nueva pestaña **Mapa**: dibujá el área de cada aspersor sobre una foto de dron / plano o sobre la vista satelital y mirá en
   vivo cuál está regando (ondas de agua, tiempo transcurrido y restante), cuál sigue y cuáles ya regaron. Varios mapas (por
   ejemplo, uno por controlador), varias áreas por aspersor, ubicación con drag & drop, edición de vértices y riego rápido desde el mapa.
+- **Seguir riego** (activado de entrada): cuando un ciclo salta a un aspersor de otro mapa (por ejemplo, de un controlador
+  al siguiente) el mapa cambia solo y se mueve hasta el área activa. La lista del ciclo indica en qué mapa está cada aspersor.
 - Respaldo: la exportación incluye las imágenes de los mapas; importar un archivo que solo trae mapas los agrega a la configuración actual.
 - Las imágenes subidas se guardan en `config/sk_irrigation/maps/` y se borran cuando ningún mapa las usa.
 
