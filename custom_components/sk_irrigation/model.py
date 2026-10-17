@@ -296,6 +296,60 @@ def normalize_settings(raw: dict | None) -> dict:
     return out
 
 
+MAP_KIND_IMAGE = "image"
+MAP_KIND_SATELLITE = "satellite"
+_MAP_IMAGE_RE = re.compile(r"^/sk_irrigation_files/maps/[A-Za-z0-9_.-]+$|^https?://\S+$|^/local/\S+$")
+
+
+def _point(raw: Any, kind: str) -> list[float] | None:
+    """One vertex: [x, y] as 0..1 fractions of an image, or [lat, lon]."""
+    if not isinstance(raw, (list, tuple)) or len(raw) != 2:
+        return None
+    if kind == MAP_KIND_SATELLITE:
+        lat, lon = _float(raw[0], None, -90, 90), _float(raw[1], None, -180, 180)
+    else:
+        lat, lon = _float(raw[0], None, -0.5, 1.5), _float(raw[1], None, -0.5, 1.5)
+    if lat is None or lon is None:
+        return None
+    return [round(lat, 7), round(lon, 7)]
+
+
+def normalize_map(raw: dict, zone_ids: set[str]) -> dict:
+    """A map view: a background (drone photo or satellite) plus zone outlines."""
+    kind = MAP_KIND_SATELLITE if raw.get("kind") == MAP_KIND_SATELLITE else MAP_KIND_IMAGE
+    image = _str(raw.get("image"))
+    shapes: dict[str, list] = {}
+    for zid, parts in (raw.get("shapes") or {}).items():
+        if zid not in zone_ids or not isinstance(parts, list):
+            continue
+        clean = []
+        for part in parts[:20]:
+            pts = [p for p in (_point(v, kind) for v in (part or [])[:200]) if p]
+            if len(pts) >= 3:
+                clean.append(pts)
+        if clean:
+            shapes[zid] = clean
+    center = _point(raw.get("center"), MAP_KIND_SATELLITE) if raw.get("center") else None
+    return {
+        "id": _str(raw.get("id")) or new_id("map"),
+        "name": _str(raw.get("name")) or "Map",
+        "kind": kind,
+        "image": image if _MAP_IMAGE_RE.match(image) else "",
+        "image_w": _int(raw.get("image_w"), 0, 0, 20000),
+        "image_h": _int(raw.get("image_h"), 0, 0, 20000),
+        "center": center,
+        "zoom": _int(raw.get("zoom"), 18, 1, 22),
+        "max_native_zoom": _int(raw.get("max_native_zoom"), 18, 10, 22),
+        "shapes": shapes,
+    }
+
+
+def map_image_files(maps: list[dict]) -> set[str]:
+    """File names of uploaded images still referenced by a map."""
+    prefix = "/sk_irrigation_files/maps/"
+    return {m["image"][len(prefix):] for m in maps if m.get("image", "").startswith(prefix)}
+
+
 def normalize_all(data: dict) -> dict:
     """Normalise a full configuration document, keeping references valid."""
     zones = [normalize_zone(z) for z in data.get("zones", []) if isinstance(z, dict)]
@@ -310,6 +364,7 @@ def normalize_all(data: dict) -> dict:
         "groups": groups,
         "programs": programs,
         "settings": normalize_settings(data.get("settings")),
+        "maps": [normalize_map(m, zone_ids) for m in data.get("maps", []) or [] if isinstance(m, dict)][:20],
     }
 
 

@@ -1,5 +1,6 @@
 """Integration tests running the engine inside a real Home Assistant core."""
 import asyncio
+import io
 from datetime import datetime
 
 import pytest
@@ -266,3 +267,29 @@ async def test_cards_registered_as_lovelace_resource(hass):
     await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()
     assert [i["url"] for i in resources.async_items()] == []
+
+
+async def test_map_image_upload_serve_and_cleanup(hass, hass_client, tmp_path):
+    hass.config.config_dir = str(tmp_path)
+    _, engine = await _setup(hass)
+    client = await hass_client()
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+    resp = await client.post("/api/sk_irrigation/map_image", data={"file": io.BytesIO(png)})
+    assert resp.status == 200
+    url = (await resp.json())["url"]
+    assert url.startswith("/sk_irrigation_files/maps/") and url.endswith(".png")
+    served = await client.get(url)
+    assert served.status == 200 and await served.read() == png
+    # not an image -> rejected
+    bad = await client.post("/api/sk_irrigation/map_image", data={"file": io.BytesIO(b"<script>")})
+    assert bad.status == 415
+
+    await engine.async_save("zones", [{"id": "z1", "name": "Z1", "entity_id": ZONES[0]}])
+    await engine.async_save("maps", [{"id": "m1", "name": "Plan", "kind": "image", "image": url,
+                                      "shapes": {"z1": [[[0.1, 0.1], [0.1, 0.3], [0.3, 0.3]]]}}])
+    assert engine.config["maps"][0]["shapes"]["z1"]
+    name = url.rsplit("/", 1)[1]
+    assert (tmp_path / DOMAIN / "maps" / name).exists()
+    # deleting the map deletes its image
+    await engine.async_save("maps", [])
+    assert not (tmp_path / DOMAIN / "maps" / name).exists()

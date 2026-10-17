@@ -96,6 +96,19 @@ const config = {
       steps: [{ id: "s4", group_id: "group_back", concurrency: 0, duration_mode: "uniform", duration: 5, durations: {} }],
       budget: 120, zone_delay_s: -1, step_delay_s: -1, ignore_conditions: false, on_busy: "skip" },
   ],
+  maps: [
+    { id: "map_plan", name: L("Jardín", "Garden"), kind: "image", image: "demo-plan.svg", image_w: 1600, image_h: 1000, center: null, zoom: 18, max_native_zoom: 18,
+      shapes: {
+        zone_1: [[[0.61, 0.05], [0.61, 0.525], [0.88, 0.525], [0.88, 0.05]]],
+        zone_2: [[[0.6, 0.5625], [0.6, 0.706], [0.88, 0.706], [0.88, 0.5625]]],
+        zone_3: [[[0.38, 0.025], [0.38, 0.119], [0.59, 0.119], [0.59, 0.025]]],
+        zone_4: [[[0.38, 0.881], [0.38, 0.975], [0.88, 0.975], [0.88, 0.881]]],
+        zone_5: [[[0.13, 0.025], [0.13, 0.6375], [0.36, 0.6375], [0.36, 0.025]], [[0.13, 0.9], [0.13, 0.975], [0.36, 0.975], [0.36, 0.9]]],
+        zone_6: [[[0.06, 0.025], [0.06, 0.975], [0.13, 0.975], [0.13, 0.025]]],
+        zone_7: [[[0.16, 0.644], [0.16, 0.894], [0.33, 0.894], [0.33, 0.644]]],
+      } },
+    { id: "map_sat", name: L("Satélite", "Satellite"), kind: "satellite", image: "", image_w: 0, image_h: 0, center: [40.4153, -3.6845], zoom: 17, max_native_zoom: 18, shapes: {} },
+  ],
   settings: { enabled: true, rain_delay_until: null, rain_sensors: ["binary_sensor.rain"], weather_entity: "weather.home",
     weather_conditions: ["rainy", "pouring", "lightning-rainy", "snowy", "snowy-rainy", "hail"], freeze_sensor: "sensor.temp_ext",
     freeze_threshold: 3, budget_entity: null, global_budget: 100, master_entity: "switch.bomba_pozo", master_lead_s: 3,
@@ -236,6 +249,8 @@ const handlers = {
 const hass = {
   language: new URLSearchParams(location.search).get("lang") || "es",
   states, services: { notify: { mobile_app_iphone: {}, telegram: {} } },
+  config: { latitude: 40.4153, longitude: -3.6845 },
+  fetchWithAuth: async (url, opts) => ({ ok: true, json: async () => ({ url: URL.createObjectURL(opts.body.get("file")) }) }),
   callWS: async (msg) => { await new Promise((r) => setTimeout(r, 60)); return JSON.parse(JSON.stringify(handlers[msg.type](msg))); },
   connection: { subscribeMessage: async (cb) => { listeners.add(cb); return () => listeners.delete(cb); } },
 };
@@ -264,13 +279,15 @@ if (qs0.get("cards")) {
 }
 window.panel = panel;
 
-// Deep links for screenshots: ?tab=programs&edit=0&run=1&dark=1
+// Deep links for screenshots: ?tab=programs&edit=0&run=1&dark=1 · ?tab=map&map=map_plan&mapedit=zone_5
 const qs = new URLSearchParams(location.search);
 if (qs.get("dark")) document.body.classList.add("dark");
 if (qs.get("tab")) document.getElementById("ctl").style.display = "none";
 setTimeout(async () => {
   if (qs.get("run")) await panel._action("run_program", { target: "prog_morning" });
   if (qs.get("tab")) panel._tab = qs.get("tab");
+  if (qs.get("map")) panel._mapId = qs.get("map");
+  if (qs.get("mapedit")) { panel._mapEdit = true; panel._mapSel = qs.get("mapedit") === "1" ? null : qs.get("mapedit"); }
   if (qs.get("edit") !== null) panel._edit = JSON.parse(JSON.stringify(panel._config.programs[Number(qs.get("edit"))]));
   panel._render();
 }, 400);

@@ -3,12 +3,14 @@
 // delegation, and implements pointer-based drag & drop (mouse + touch).
 import { I18N } from "./sk-irrigation-i18n.js?v=1.3.5";
 import { STYLES } from "./sk-irrigation-styles.js?v=1.3.5";
+import { MapMixin } from "./sk-irrigation-map.js?v=1.3.5";
 
 const DOMAIN = "sk_irrigation";
 const TABS = [
   ["dashboard", "mdi:view-dashboard-outline"],
   ["groups", "mdi:vector-arrange-below"],
   ["programs", "mdi:calendar-clock"],
+  ["map", "mdi:map-outline"],
   ["settings", "mdi:cog-outline"],
   ["history", "mdi:history"],
 ];
@@ -92,6 +94,7 @@ class SkIrrigationPanel extends HTMLElement {
     this._search = "";
     this._domain = "suggested";
     this._skew = 0;
+    try { this._mapId = localStorage.getItem("ski-map"); } catch (e) { /* ignore */ }
     const sr = this.shadowRoot;
     sr.addEventListener("click", (e) => this._onClick(e));
     sr.addEventListener("change", (e) => this._onChange(e));
@@ -130,7 +133,13 @@ class SkIrrigationPanel extends HTMLElement {
     const mb = this.shadowRoot.querySelector("ha-menu-button");
     if (mb) mb.hass = hass;
     if (first) this._connect();
-    else this._updateEntityStates();
+    else {
+      this._updateEntityStates();
+      if (this._tab === "map" && !this._state?.current) {
+        const key = this._zones.map((z) => (this._isOn(z.entity_id) ? 1 : 0)).join("");
+        if (key !== this._mapOnKey) { this._mapOnKey = key; this._render(); }
+      }
+    }
   }
 
   get hass() { return this._hass; }
@@ -207,6 +216,10 @@ class SkIrrigationPanel extends HTMLElement {
     const structural = prevStatus !== this._state.status || prevRun !== this._state.current?.id || prevActive !== activeNow;
     if (this._tab === "dashboard" || this._tab === "history" || (this._tab === "programs" && !this._edit)) {
       if (structural || msg.config || this._tab !== "dashboard") this._render();
+    }
+    if (this._tab === "map") {
+      if (structural) this._render();
+      else this._mapRefresh();
     }
     this._renderToolbar();
   }
@@ -349,6 +362,7 @@ class SkIrrigationPanel extends HTMLElement {
     if (mb) { mb.hass = this._hass; mb.narrow = this._narrow; }
     if (this._tab === "settings" || (this._tab === "programs" && this._edit)) this._scheduleCondCheck();
     if (this._pk && this._pkEl) sr.appendChild(this._pkEl);
+    if (this._tab === "map" && this._config) this._mapAttach();
     this._tick();
   }
 
@@ -378,11 +392,12 @@ class SkIrrigationPanel extends HTMLElement {
     this._ticks = (this._ticks || 0) + 1;
     if (this._ticks % 10 === 0 && this.shadowRoot.querySelector("[data-cond-res]")) this._checkConditions();
     const now = this._now();
-    this.shadowRoot.querySelectorAll("[data-end]").forEach((el) => {
+    this.shadowRoot.querySelectorAll("[data-end], [data-mode=elapsed]").forEach((el) => {
       const end = Date.parse(el.dataset.end);
       const start = Date.parse(el.dataset.start);
       const total = Math.max(1, end - start);
       const pct = Math.min(100, Math.max(0, ((now - start) / total) * 100));
+      if (el.dataset.mode === "elapsed") { el.textContent = Number.isNaN(start) ? "" : fmtClock((now - start) / 1000); return; }
       if (el.dataset.mode === "clock") el.textContent = fmtClock((end - now) / 1000);
       else if (el.dataset.mode === "bar") el.style.width = `${pct}%`;
       else if (el.dataset.mode === "ring") el.style.setProperty("--p", pct.toFixed(1));
@@ -1523,6 +1538,7 @@ class SkIrrigationPanel extends HTMLElement {
     const id = el.dataset.id;
     const n = el.dataset.n !== undefined ? Number(el.dataset.n) : null;
     const p = this._edit;
+    if (a.startsWith("map-")) { await this._mapAction(a, el); return; }
     switch (a) {
       case "pick": this._openPicker(el.dataset.pick, el); return;
       case "pk-close": this._closePicker(); return;
@@ -1842,6 +1858,14 @@ class SkIrrigationPanel extends HTMLElement {
         break;
       }
       case "dlgz": this._dialog.draft[a] = v; return;
+      case "map": {
+        const view = this._mapView();
+        if (!view) return;
+        view[a] = a === "max_native_zoom" ? Number(v) : v;
+        this._queueSave("maps", true);
+        return;
+      }
+      case "map-image": await this._mapUpload(el.files?.[0]); el.value = ""; return;
       case "cond": {
         const [, scope, idx, field] = bind.split(":");
         const c = this._condList(scope)[Number(idx)];
@@ -1860,9 +1884,16 @@ class SkIrrigationPanel extends HTMLElement {
         const file = el.files?.[0];
         if (!file) return;
         const text = await file.text();
-        this._confirm(this.t("import_confirm"), async () => {
-          const parsed = JSON.parse(text);
-          const res = await this._ws({ type: `${DOMAIN}/import`, config: parsed.config || parsed });
+        el.value = "";
+        let parsed;
+        try { parsed = JSON.parse(text); } catch (err) { this._toast(this.t("import_invalid")); return; }
+        const incoming = parsed.config || parsed;
+        // A file with only "maps" adds those maps to the current configuration.
+        const mapsOnly = Array.isArray(incoming.maps) && !incoming.zones && !incoming.groups && !incoming.programs;
+        this._confirm(mapsOnly ? this.t("import_maps_confirm", { n: incoming.maps.length }) : this.t("import_confirm"), async () => {
+          let config = await this._mapsForImport(incoming);
+          if (mapsOnly) config = this._mergeImportedMaps(config.maps);
+          const res = await this._ws({ type: `${DOMAIN}/import`, config });
           this._config = res.config;
           this._syncEdit(true);
           this._toast(this.t("imported"));
@@ -1903,8 +1934,9 @@ class SkIrrigationPanel extends HTMLElement {
     this._render();
   }
 
-  _export() {
-    const blob = new Blob([JSON.stringify({ version: this._version, config: this._config }, null, 2)], { type: "application/json" });
+  async _export() {
+    const config = await this._mapsForExport(clone(this._config));
+    const blob = new Blob([JSON.stringify({ version: this._version, config }, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `sk-irrigation-${new Date().toISOString().slice(0, 10)}.json`;
@@ -1943,6 +1975,8 @@ class SkIrrigationPanel extends HTMLElement {
       d.marker.className = "drop-marker";
     }
     e.preventDefault();
+    d.cx = e.clientX;
+    d.cy = e.clientY;
     d.ghost.style.left = `${e.clientX - d.ox}px`;
     d.ghost.style.top = `${e.clientY - d.oy}px`;
     const under = this.shadowRoot.elementFromPoint(e.clientX, e.clientY);
@@ -1986,6 +2020,7 @@ class SkIrrigationPanel extends HTMLElement {
     this._justDragged = true;
     setTimeout(() => { this._justDragged = false; }, 60);
     this._cleanupDrag(d);
+    if (d.data.t === "mapzone") { if (d.target) this._mapPlaceFromClient(d.data.z, d.cx, d.cy); return; }
     if (d.target) this._drop(d.data, d.target.dataset.drop, d.index);
   }
 
@@ -2052,6 +2087,8 @@ class SkIrrigationPanel extends HTMLElement {
     this._render();
   }
 }
+
+Object.defineProperties(SkIrrigationPanel.prototype, Object.getOwnPropertyDescriptors(MapMixin));
 
 if (!customElements.get("sk-irrigation-panel")) {
   customElements.define("sk-irrigation-panel", SkIrrigationPanel);

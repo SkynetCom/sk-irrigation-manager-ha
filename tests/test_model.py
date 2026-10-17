@@ -147,3 +147,27 @@ def test_condition_state_numeric_unavailable():
     assert "sensor.soc > 20" == m.describe_condition(soc)
     cfg = m.normalize_all({"settings": {"conditions": [{"type": "numeric", "entity_id": "sensor.soc", "above": 20}]}})
     assert cfg["settings"]["conditions"][0]["above"] == 20.0
+
+
+def test_maps_normalisation():
+    cfg = m.normalize_all({
+        "zones": [{"id": "z1", "name": "A", "entity_id": "switch.a"}],
+        "maps": [
+            {"id": "m1", "name": "Plan", "kind": "image", "image": "/sk_irrigation_files/maps/abc.jpg", "image_w": 1600, "image_h": 1000,
+             "shapes": {
+                 "z1": [[[0.1, 0.1], [0.1, 0.2], [0.2, 0.2]], [[0.5, 0.5], [0.6, 0.6]]],  # 2nd part has < 3 points
+                 "ghost": [[[0.1, 0.1], [0.1, 0.2], [0.2, 0.2]]],
+             }},
+            {"id": "m2", "kind": "satellite", "center": [9.6493, -85.1497], "image": "javascript:alert(1)",
+             "shapes": {"z1": [[[9.649, -85.149], [9.6491, -85.1489], [9.6492, -85.149], ["x", 1]]]}},
+        ],
+    })
+    plan, sat = cfg["maps"]
+    assert plan["shapes"] == {"z1": [[[0.1, 0.1], [0.1, 0.2], [0.2, 0.2]]]}
+    assert plan["image"] == "/sk_irrigation_files/maps/abc.jpg"
+    assert sat["kind"] == "satellite" and sat["image"] == "" and sat["center"] == [9.6493, -85.1497]
+    assert len(sat["shapes"]["z1"][0]) == 3
+    assert m.map_image_files(cfg["maps"]) == {"abc.jpg"}
+    # a deleted sprinkler disappears from every map
+    cfg2 = m.normalize_all({**cfg, "zones": []})
+    assert cfg2["maps"][0]["shapes"] == {}

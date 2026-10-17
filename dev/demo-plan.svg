@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <!-- Fictional garden plan used by the UI demo and the README screenshots. -->
+  <defs>
+    <pattern id="grass" width="24" height="24" patternUnits="userSpaceOnUse">
+      <rect width="24" height="24" fill="#8fbf6a"/>
+      <path d="M3 20l3-8M12 22l2-9M19 19l3-7" stroke="#7aab57" stroke-width="2"/>
+    </pattern>
+    <pattern id="bed" width="18" height="18" patternUnits="userSpaceOnUse">
+      <rect width="18" height="18" fill="#a07a55"/>
+      <circle cx="5" cy="6" r="3" fill="#6f9f4c"/><circle cx="13" cy="13" r="3.5" fill="#5f8f3f"/>
+    </pattern>
+    <radialGradient id="tree" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#5f9a3f"/><stop offset="1" stop-color="#2f6424"/></radialGradient>
+  </defs>
+  <rect width="1600" height="1000" fill="#d9cfb8"/>
+  <!-- street and sidewalk -->
+  <rect x="0" y="930" width="1600" height="70" fill="#8d9298"/>
+  <rect x="0" y="905" width="1600" height="25" fill="#c9c6bd"/>
+  <!-- lawns -->
+  <rect x="80" y="610" width="760" height="270" rx="18" fill="url(#grass)"/>
+  <rect x="900" y="600" width="230" height="280" rx="14" fill="url(#bed)"/>
+  <rect x="40" y="60" width="1520" height="300" rx="22" fill="url(#grass)"/>
+  <rect x="40" y="380" width="150" height="210" rx="12" fill="url(#bed)"/>
+  <rect x="1410" y="380" width="150" height="500" rx="12" fill="url(#bed)"/>
+  <!-- back beds -->
+  <rect x="40" y="60" width="1520" height="70" rx="22" fill="url(#bed)"/>
+  <!-- house -->
+  <rect x="230" y="390" width="760" height="200" fill="#b74b3a"/>
+  <path d="M230 490h760" stroke="#9c3d2e" stroke-width="6"/>
+  <rect x="990" y="420" width="380" height="150" fill="#c9c3b6"/>
+  <!-- path and driveway -->
+  <rect x="860" y="590" width="30" height="315" fill="#e8e1d2"/>
+  <rect x="1160" y="590" width="220" height="315" fill="#b9b3a6"/>
+  <!-- pool -->
+  <rect x="1040" y="170" width="380" height="150" rx="16" fill="#e9f3f6"/>
+  <rect x="1055" y="185" width="350" height="120" rx="12" fill="#3fb7e0"/>
+  <!-- trees -->
+  <g fill="url(#tree)"><circle cx="130" cy="230" r="55"/><circle cx="520" cy="200" r="70"/><circle cx="760" cy="760" r="48"/><circle cx="1500" cy="480" r="40"/></g>
+</svg>

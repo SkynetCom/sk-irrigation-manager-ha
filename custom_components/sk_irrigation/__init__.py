@@ -24,6 +24,7 @@ from .const import (
     default_sidebar_title,
 )
 from .engine import IrrigationEngine
+from .maps import async_register_files
 from .services import async_register_services, async_unregister_services
 from .store import IrrigationStore
 from .websocket_api import async_register_websocket
@@ -69,6 +70,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if not domain_data.get("ws_registered"):
         async_register_websocket(hass)
+        await async_register_files(hass)
         domain_data["ws_registered"] = True
 
     async_register_services(hass)

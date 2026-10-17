@@ -87,6 +87,17 @@ Válvula maestra o bomba, límite hidráulico de aspersores simultáneos, tiempo
 
 > 💡 ¿Querés probar la interfaz sin instalar nada? Abrí [`dev/demo.html`](https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/dev/demo.html) con un servidor local (ver [Desarrollo](#-desarrollo)).
 
+## 🗺️ Mapa
+
+Subí una **foto de dron o un plano** de tu terreno (o usá la vista **satelital**), dibujá el área de cada aspersor y mirá el predio en vivo: el aspersor que riega se ilumina con ondas de agua y una etiqueta que dice **hace cuánto está encendido** y cuánto le falta; el próximo aparece remarcado, y también se distinguen los que ya regaron y los que no riegan en ese ciclo. Tocá un área para regarla 5, 10 o 15 minutos.
+
+<p align="center"><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/map.es.png" alt="Pestaña Mapa" width="100%"></p>
+
+- **Varios mapas**, por ejemplo uno por controlador y una vista satelital de todo el predio.
+- **Arrastrá** un aspersor de la lista al mapa y ajustá su contorno: mové las esquinas, arrastrá los puntos intermedios para sumar esquinas, doble clic en una esquina para borrarla y ✥ para mover toda el área.
+- Un aspersor puede tener **varias áreas separadas** (dos franjas de césped, un cantero a cada lado…); se encienden todas juntas.
+- Los mapas son parte de tu configuración: **Ajustes → Respaldo** los exporta con sus imágenes, y un archivo que solo trae mapas se **agrega** a la configuración actual en lugar de reemplazarla.
+
 ## 🧩 Tarjetas para dashboards
 
 La integración trae 4 tarjetas que **se cargan solas**: no hace falta agregar recursos. Editá un dashboard → **Agregar tarjeta** → buscá **"SK Riego"**.
@@ -253,7 +264,9 @@ pip install pytest-homeassistant-custom-component
 pytest tests
 ```
 
-Estructura: `custom_components/sk_irrigation/` (motor, scheduler, API websocket, entidades), `frontend/` (panel web sin dependencias), `brand/` (íconos para HA 2026.3+), `tests/`, `dev/demo.html`.
+La pestaña Mapa incluye [Leaflet](https://leafletjs.com) 1.9.4 (BSD-2-Clause) en `frontend/vendor/`. Imágenes satelitales: Esri World Imagery.
+
+Estructura: `custom_components/sk_irrigation/` (motor, scheduler, API websocket, entidades), `frontend/` (panel web, sin compilación), `brand/` (íconos para HA 2026.3+), `tests/`, `dev/demo.html`.
 
 Historial de versiones en [CHANGELOG.es.md](https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/CHANGELOG.es.md).
 

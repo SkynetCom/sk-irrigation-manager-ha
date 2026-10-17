@@ -46,6 +46,7 @@ from .model import (
     next_active_days,
     resolve_concurrency,
 )
+from .maps import async_cleanup_images
 from .store import IrrigationStore
 
 _LOGGER = logging.getLogger(__name__)
@@ -214,6 +215,8 @@ class IrrigationEngine:
     async def async_save(self, key: str, value: Any) -> None:
         before = {p["id"] for p in self.config["programs"]}
         await self.store.async_update(key, value)
+        if key == "maps":
+            await async_cleanup_images(self.hass, self.config["maps"])
         after = {p["id"] for p in self.config["programs"]}
         if key == "programs" or before != after:
             async_dispatcher_send(self.hass, SIGNAL_PROGRAMS_CHANGED)

@@ -2,6 +2,13 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
+## Unreleased
+- New **Map** tab: draw each sprinkler's area on a drone photo / site plan or on satellite imagery and see live which one is
+  watering (ripple animation, elapsed and remaining time), which one is next and which ones already ran. Several maps (for
+  example one per controller), several areas per sprinkler, drag & drop placement, vertex editing and quick watering from the map.
+- Backup: exports include map images; importing a file that only contains maps adds them to the current configuration.
+- Uploaded images are stored in `config/sk_irrigation/maps/` and deleted when no map uses them.
+
 ## 1.3.5 — 2026-10-16
 - English is now the primary documentation language (README, changelog and screenshots), with a full Spanish version.
 - The sidebar title of a new install and the card names in the card picker follow the Home Assistant language ("Irrigation" / "Riego").

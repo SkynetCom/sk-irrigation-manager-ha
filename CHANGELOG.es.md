@@ -2,6 +2,13 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
+## Sin publicar
+- Nueva pestaña **Mapa**: dibujá el área de cada aspersor sobre una foto de dron / plano o sobre la vista satelital y mirá en
+  vivo cuál está regando (ondas de agua, tiempo transcurrido y restante), cuál sigue y cuáles ya regaron. Varios mapas (por
+  ejemplo, uno por controlador), varias áreas por aspersor, ubicación con drag & drop, edición de vértices y riego rápido desde el mapa.
+- Respaldo: la exportación incluye las imágenes de los mapas; importar un archivo que solo trae mapas los agrega a la configuración actual.
+- Las imágenes subidas se guardan en `config/sk_irrigation/maps/` y se borran cuando ningún mapa las usa.
+
 ## 1.3.5 — 2026-10-16
 - Documentación en inglés como idioma principal (README, historial de cambios y capturas), con versión completa en español.
 - El título de la barra lateral de una instalación nueva y los nombres de las tarjetas en el selector siguen el idioma de Home Assistant ("Irrigation" / "Riego").

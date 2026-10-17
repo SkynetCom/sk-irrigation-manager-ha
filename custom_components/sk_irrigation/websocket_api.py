@@ -11,6 +11,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import DOMAIN, SIGNAL_PROGRAMS_CHANGED, VERSION
 from .engine import ConditionBlocked, IrrigationEngine
+from .maps import async_cleanup_images
 from .model import normalize_conditions
 
 
@@ -64,7 +65,7 @@ def ws_subscribe(hass: HomeAssistant, connection: websocket_api.ActiveConnection
 
 @websocket_api.websocket_command({
     vol.Required("type"): f"{DOMAIN}/save",
-    vol.Required("key"): vol.In(["zones", "groups", "programs", "settings", "layout"]),
+    vol.Required("key"): vol.In(["zones", "groups", "programs", "settings", "layout", "maps"]),
     vol.Required("value"): vol.Any(list, dict),
 })
 @websocket_api.require_admin
@@ -88,6 +89,7 @@ async def ws_import(hass: HomeAssistant, connection: websocket_api.ActiveConnect
     if not engine:
         return _not_loaded(connection, msg)
     await engine.store.async_replace(msg["config"])
+    await async_cleanup_images(hass, engine.config["maps"])
     async_dispatcher_send(hass, SIGNAL_PROGRAMS_CHANGED)
     engine._watch_condition_entities()
     engine.notify(config_changed=True)

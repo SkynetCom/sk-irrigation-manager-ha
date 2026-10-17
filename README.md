@@ -87,6 +87,17 @@ Master valve or pump, a hydraulic limit on simultaneous sprinklers, a maximum ti
 
 > 💡 Want to try the interface without installing anything? Open [`dev/demo.html`](https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/dev/demo.html) from a local web server (see [Development](#-development)).
 
+## 🗺️ Map
+
+Upload a top-down **drone photo or a site plan** (or use **satellite** imagery), draw each sprinkler's area on it and watch the property live: the sprinkler that is watering glows with a ripple and a badge showing **how long it has been on** and how much is left; the next one is outlined, and the ones already done or not in this cycle are shown too. Tap an area to water it for 5, 10 or 15 minutes.
+
+<p align="center"><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/map.png" alt="Map tab" width="100%"></p>
+
+- **Several maps**, for example one per controller plus a satellite view of the whole property.
+- **Drag & drop** a sprinkler from the list onto the map, then adjust its outline: move the corners, drag the small midpoints to add corners, double-click a corner to delete it and use ✥ to move the whole area.
+- A sprinkler can have **several separate areas** (two strips of lawn, a bed on each side…); all of them light up together.
+- Maps are part of your configuration: **Settings → Backup** exports them with their images, and a file that only contains maps is **added** to the current configuration instead of replacing it.
+
 ## 🧩 Dashboard cards
 
 The integration ships 4 cards that **load automatically**: no resources to add. Edit a dashboard → **Add card** → search for **"SK Irrigation"**.
@@ -255,7 +266,9 @@ pip install pytest-homeassistant-custom-component
 pytest tests
 ```
 
-Layout: `custom_components/sk_irrigation/` (engine, scheduler, websocket API, entities), `frontend/` (dependency-free web panel), `brand/` (icons for HA 2026.3+), `tests/`, `dev/demo.html`.
+The Map tab bundles [Leaflet](https://leafletjs.com) 1.9.4 (BSD-2-Clause) in `frontend/vendor/`. Satellite imagery: Esri World Imagery.
+
+Layout: `custom_components/sk_irrigation/` (engine, scheduler, websocket API, entities), `frontend/` (web panel, no build step), `brand/` (icons for HA 2026.3+), `tests/`, `dev/demo.html`.
 
 Release history in [CHANGELOG.md](https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/CHANGELOG.md).
 

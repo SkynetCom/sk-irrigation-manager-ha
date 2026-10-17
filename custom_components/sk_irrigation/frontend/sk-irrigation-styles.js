@@ -357,4 +357,89 @@ td { padding: 10px 8px; border-bottom: 1px solid var(--ski-line); vertical-align
 @keyframes glow { 0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ski-water) 45%, transparent); } 50% { box-shadow: 0 0 0 5px transparent; } }
 @keyframes fade { from { opacity: 0; } }
 @keyframes rise { from { opacity: 0; transform: translate(-50%, 10px); } }
+/* ---------- map tab ---------- */
+.map-empty { padding: 48px 20px; }
+.map-empty h2 { margin: 4px 0 6px; color: var(--ski-text); font-size: 18px; }
+.map-empty .hint { max-width: 520px; margin: 0 auto 18px; }
+.map-card { display: flex; flex-direction: column; }
+.map-bar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--ski-line); flex-wrap: wrap; }
+.map-bar .chip ha-icon { color: inherit; }
+.chip.add { border-style: dashed; color: var(--ski-muted); }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #00c853; box-shadow: 0 0 0 0 #00c85399; animation: livedot 1.4s infinite; }
+@keyframes livedot { to { box-shadow: 0 0 0 7px #00c85300; } }
+.map-hint { padding: 10px 14px; font-size: 13px; line-height: 1.45; background: color-mix(in srgb, var(--ski-amber) 14%, var(--ski-card)); border-bottom: 1px solid var(--ski-line); }
+.map-slot { position: relative; }
+.map-slot.over { outline: 3px dashed var(--ski-primary); outline-offset: -3px; }
+.map-host { position: relative; }
+.map-el { height: min(68vh, 760px); min-height: 360px; background: #dfe5ea; }
+@media (max-width: 600px) { .map-el { height: 52vh; min-height: 300px; } .leaflet-tooltip.ski-lbl { font-size: 11px; padding: 1px 5px; } }
+.map-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 800; }
+.map-msg { pointer-events: auto; position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  background: color-mix(in srgb, var(--ski-card) 88%, transparent); color: var(--ski-muted); text-align: center; padding: 20px; }
+.map-msg ha-icon { --mdc-icon-size: 44px; opacity: .6; }
+.map-msg b { color: var(--ski-text); }
+.map-banner { pointer-events: auto; position: absolute; left: 50%; top: 12px; transform: translateX(-50%); background: var(--ski-card); color: var(--ski-text);
+  padding: 8px 10px 8px 14px; border-radius: 99px; box-shadow: 0 6px 20px rgba(0,0,0,.25); display: flex; gap: 10px; align-items: center; font-size: 13px; white-space: nowrap; }
+.map-tray { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--ski-line); }
+.zchip.mini { padding: 4px 10px; font-size: 12.5px; border-style: dashed; cursor: grab; gap: 6px; }
+.map-legend { display: flex; flex-wrap: wrap; gap: 14px; padding: 10px 14px; border-top: 1px solid var(--ski-line); font-size: 12px; color: var(--ski-muted); }
+.map-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lg { width: 16px; height: 11px; border-radius: 3px; border: 2px solid; display: inline-block; }
+.lg.on { background: #00c85366; border-color: #00e676; }
+.lg.next { background: #f2a90033; border-color: #e08a00; border-style: dashed; }
+.lg.done { background: #2e9e6b2e; border-color: #2e9e6b; }
+.lg.idle { background: #1e88e533; border-color: #1565c0; }
+.lg.off { background: #8a96a333; border-color: #8a96a3; border-style: dashed; }
+div.field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--ski-muted); font-weight: 500; }
+.run-name { font-size: 16px; }
+.run-list { padding: 0 0 8px; max-height: 60vh; overflow: auto; }
+.run-row { display: flex; align-items: center; gap: 10px; padding: 7px 16px; font-size: 13px; }
+.run-row[data-action] { cursor: pointer; }
+.run-row[data-action]:hover { background: rgba(127,127,127,.06); }
+.run-row .n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: rgba(127,127,127,.12); color: var(--ski-muted); flex: none; }
+.run-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-row .t { color: var(--ski-muted); font-variant-numeric: tabular-nums; }
+.run-row.on { background: color-mix(in srgb, var(--ski-green) 12%, transparent); }
+.run-row.on .n { background: var(--ski-green); color: #fff; }
+.run-row.on .t { color: var(--ski-green); font-weight: 700; }
+.run-row.next .n { background: var(--ski-amber); color: #fff; }
+.run-row.done { color: var(--ski-muted); }
+.run-row.done .n { background: color-mix(in srgb, var(--ski-green) 25%, transparent); color: var(--ski-green); }
+/* leaflet layers */
+.leaflet-container { font: inherit; background: #dfe5ea; }
+/* hide hairline seams between satellite tiles */
+.leaflet-container img.leaflet-tile { width: 256.5px !important; height: 256.5px !important; }
+path.ski-z { cursor: pointer; fill-opacity: .22; stroke-opacity: .95; transition: fill-opacity .3s; }
+path.ski-z:hover { fill-opacity: .4; }
+path.ski-z.idle, path.ski-z.queued { fill: #1e88e5; stroke: #1565c0; }
+path.ski-z.off { fill: #8a96a3; stroke: #8a96a3; stroke-dasharray: 6 8; fill-opacity: .18; }
+path.ski-z.done { fill: #2e9e6b; stroke: #2e9e6b; fill-opacity: .2; }
+path.ski-z.next { fill: #f2a900; stroke: #e08a00; stroke-dasharray: 14 10; fill-opacity: .2; }
+path.ski-z.on { fill: #00c853; stroke: #00e676; stroke-width: 5; fill-opacity: .5; animation: zone-on 1.6s ease-in-out infinite; }
+path.ski-z.sel { stroke: #fff; stroke-width: 4; stroke-dasharray: none; fill-opacity: .45; }
+@keyframes zone-on { 50% { stroke-width: 10; stroke: #b9f6ca; fill-opacity: .35; } }
+.leaflet-tooltip.ski-lbl { background: rgba(13,43,82,.72); color: #fff; border: 0; box-shadow: none; font-size: 12px; font-weight: 600; padding: 2px 7px; border-radius: 6px; }
+.leaflet-tooltip.ski-lbl::before { display: none; }
+.leaflet-tooltip.ski-badge { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; border-radius: 12px; border: 0;
+  box-shadow: 0 8px 24px rgba(0,0,0,.3); background: #fff; color: #1b2733; white-space: nowrap; }
+.ski-badge .bt { display: flex; flex-direction: column; line-height: 1.25; }
+.ski-badge .bt b { font-size: 13px; }
+.ski-badge .tm { font-weight: 800; color: #1b7a4f; font-size: 14px; font-variant-numeric: tabular-nums; }
+.ski-badge .tm small { font-weight: 500; color: #66727f; font-size: 12px; }
+.mring { --p: 0; width: 34px; height: 34px; border-radius: 50%; flex: none;
+  background: radial-gradient(closest-side, #fff 72%, transparent 73%), conic-gradient(#2e9e6b calc(var(--p) * 1%), #e3eae6 0); }
+.mring.full { background: radial-gradient(closest-side, #fff 72%, transparent 73%), conic-gradient(#2e9e6b 100%, #2e9e6b 0); animation: pulse 1.4s infinite; }
+.ski-ripple { pointer-events: none; }
+.ski-ripple i { position: absolute; inset: 0; border-radius: 50%; border: 3px solid rgba(255,255,255,.95); animation: ripple 2.1s ease-out infinite; opacity: 0; }
+.ski-ripple i:nth-child(2) { animation-delay: .7s; }
+.ski-ripple i:nth-child(3) { animation-delay: 1.4s; }
+@keyframes ripple { 0% { transform: scale(.15); opacity: 1; } 100% { transform: scale(1.4); opacity: 0; } }
+.ski-vx { background: #fff; border: 3px solid #1565c0; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,.4); cursor: grab; }
+.ski-mid { background: rgba(255,255,255,.75); border: 2px solid #1565c0; border-radius: 50%; cursor: copy; }
+.ski-move { background: #1565c0; color: #fff; border-radius: 50%; display: grid !important; place-items: center; font-size: 18px; line-height: 1; box-shadow: 0 2px 8px rgba(0,0,0,.4); cursor: move; }
+.ski-popup .leaflet-popup-content { margin: 12px 14px; }
+.map-pop { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.map-pop b { font-size: 14px; }
+.map-pop .row { margin-top: 8px; gap: 6px; flex-wrap: wrap; }
+.map-pop .btn.sm { padding: 5px 10px; font-size: 13px; }
 `;

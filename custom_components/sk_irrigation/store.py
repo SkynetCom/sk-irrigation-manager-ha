@@ -46,7 +46,7 @@ class IrrigationStore:
             # zones + groups saved together so new sprinklers and their group
             # membership land in a single, consistent write.
             draft.update({k: value[k] for k in ("zones", "groups") if k in value})
-        elif key in ("zones", "groups", "programs", "settings"):
+        elif key in ("zones", "groups", "programs", "settings", "maps"):
             draft[key] = value
         else:
             raise ValueError(f"Unknown key {key}")
