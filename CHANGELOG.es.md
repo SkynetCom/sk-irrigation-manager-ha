@@ -2,7 +2,7 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
-## Sin publicar
+## 1.4.0 — 2026-10-17
 - Nueva pestaña **Mapa**: dibujá el área de cada aspersor sobre una foto de dron / plano o sobre la vista satelital y mirá en
   vivo cuál está regando (ondas de agua, tiempo transcurrido y restante), cuál sigue y cuáles ya regaron. Varios mapas (por
   ejemplo, uno por controlador), varias áreas por aspersor, ubicación con drag & drop, edición de vértices y riego rápido desde el mapa.

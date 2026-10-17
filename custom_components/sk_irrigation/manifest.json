@@ -22,5 +22,5 @@
   "issue_tracker": "https://github.com/SkynetCom/sk-irrigation-manager-ha/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "1.3.5"
+  "version": "1.4.0"
 }

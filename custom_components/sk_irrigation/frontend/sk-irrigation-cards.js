@@ -2,7 +2,7 @@
 // Loaded globally by the integration (no manual resource needed). All cards on
 // a dashboard share one websocket subscription through a tiny store.
 const DOMAIN = "sk_irrigation";
-const CARD_VERSION = "1.3.5";
+const CARD_VERSION = "1.4.0";
 
 const T = {
   es: {

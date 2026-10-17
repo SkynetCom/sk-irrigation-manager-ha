@@ -3,7 +3,7 @@ from __future__ import annotations
 
 DOMAIN = "sk_irrigation"
 NAME = "SK Irrigation Manager"
-VERSION = "1.3.5"
+VERSION = "1.4.0"
 
 STORAGE_KEY = f"{DOMAIN}.data"
 STORAGE_VERSION = 1
