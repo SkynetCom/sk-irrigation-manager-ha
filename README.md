@@ -76,6 +76,14 @@ Draw each sprinkler's area on your **drone photo, site plan or satellite imagery
 
 </td>
 </tr>
+<tr>
+<td colspan="3" valign="top">
+
+### 📈 Watering report
+How much each program, group and sprinkler watered, by **day, week, month or year**: stacked bars, completed and skipped cycles (rain or conditions), totals versus the previous period and a per-sprinkler breakdown for every bar. Daily totals are kept for years. [See the report ↓](#-watering-report)
+
+</td>
+</tr>
 </table>
 
 ## 🧭 How it works

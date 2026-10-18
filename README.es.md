@@ -76,6 +76,14 @@ Dibujá el área de cada aspersor sobre tu **foto de dron, plano o imagen sateli
 
 </td>
 </tr>
+<tr>
+<td colspan="3" valign="top">
+
+### 📈 Reporte de riego
+Cuánto regó cada programa, grupo y aspersor, por **día, semana, mes o año**: barras apiladas, ciclos completos y omitidos (por lluvia o condiciones), totales comparados con el período anterior y el detalle por aspersor de cada barra. Los totales diarios se guardan por años. [Ver el reporte ↓](#-reporte-de-riego)
+
+</td>
+</tr>
 </table>
 
 ## 🧭 Cómo funciona
