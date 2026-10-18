@@ -95,6 +95,14 @@ Dibujá el área de cada aspersor sobre tu **foto de dron, plano o imagen sateli
 
 > 💡 ¿Querés probar la interfaz sin instalar nada? Abrí [`dev/demo.html`](https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/dev/demo.html) con un servidor local (ver [Desarrollo](#-desarrollo)).
 
+## 📈 Reporte de riego
+
+El Panel incluye un reporte de cuánto regó cada aspersor, grupo y programa: **barras apiladas por programa**, líneas de **ciclos completos y omitidos** (por lluvia o condiciones) y totales con la variación respecto del período anterior. Agrupalo por **día, semana, mes o año**, filtralo por programa, grupo o aspersor, y elegí ver tiempo regado o litros estimados (según el caudal de cada aspersor).
+
+<p align="center"><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/report.es.png" alt="Reporte de riego" width="100%"></p>
+
+Pasá el mouse (o tocá, en el celular) una barra para ver el detalle de ese período: los totales de un lado y **cada aspersor** del otro, en columnas por controlador, dispositivo o área. Los totales diarios se guardan **por años** en un archivo propio, aparte del historial de riegos, y el reporte arranca con el historial que ya tenés.
+
 ## 🗺️ Mapa
 
 Subí una **foto de dron o un plano** de tu terreno (o usá la vista **satelital**), dibujá el área de cada aspersor y mirá el predio en vivo: el aspersor que riega se ilumina con ondas de agua y una etiqueta que dice **hace cuánto está encendido** y cuánto le falta; el próximo aparece remarcado, y también se distinguen los que ya regaron y los que no riegan en ese ciclo. Tocá un área para regarla 5, 10 o 15 minutos.

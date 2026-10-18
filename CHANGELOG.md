@@ -2,6 +2,13 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
+## Unreleased
+- New **watering report** on the Dashboard: stacked bars per program, completed and skipped cycles, KPIs with the change
+  versus the previous period; group by day, week, month or year; filter by program, group or sprinkler; time or estimated
+  liters. Hover or tap a bar for the full detail of that period, with every sprinkler in columns (by controller, device or area).
+- Daily totals per program and sprinkler are stored for years in `.storage/sk_irrigation.data.stats` (new
+  `sk_irrigation/stats` websocket command) and seeded from the existing history on first start.
+
 ## 1.4.0 — 2026-10-17
 - New **Map** tab: draw each sprinkler's area on a drone photo / site plan or on satellite imagery and see live which one is
   watering (ripple animation, elapsed and remaining time), which one is next and which ones already ran. Several maps (for

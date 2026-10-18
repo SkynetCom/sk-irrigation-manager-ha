@@ -488,3 +488,46 @@ def estimate_plan_seconds(steps: list[PlannedStep], global_cap: int, zone_delay:
         if i < len(steps) - 1:
             total += step_delay
     return total
+
+
+# --------------------------------------------------------------------------
+# Daily statistics (Dashboard report)
+# --------------------------------------------------------------------------
+
+STATS_MANUAL = "_manual"
+STATS_KEEP_DAYS = 3700  # about ten years
+_RAIN_WORDS = ("rain", "lluv", "precip", "weather", "llov")
+
+
+def skip_category(reason: str) -> str:
+    """Bucket a skip reason: "rain" (rain sensors, weather, rain delay, rain conditions) or "cond"."""
+    text = (reason or "").lower()
+    return "rain" if any(w in text for w in _RAIN_WORDS) else "cond"
+
+
+def add_run_to_stats(stats: dict, entry: dict) -> None:
+    """Fold one history entry into the per-day, per-program, per-sprinkler totals.
+
+    ``stats`` maps "YYYY-MM-DD" (local date of the run start) to
+    ``{program_key: {"z": {zone_id: seconds}, "ok": n, "stop": n, "rain": n, "cond": n}}``.
+    """
+    start = entry.get("start") or entry.get("end")
+    if not isinstance(start, str) or len(start) < 10:
+        return
+    day = stats.setdefault(start[:10], {})
+    prog = day.setdefault(entry.get("program_id") or STATS_MANUAL, {"z": {}, "ok": 0, "stop": 0, "rain": 0, "cond": 0})
+    status = entry.get("status")
+    if status == "skipped":
+        prog[skip_category(entry.get("reason", ""))] += 1
+        return
+    prog["ok" if status == "completed" else "stop"] += 1
+    for z in entry.get("zones") or []:
+        zid, sec = z.get("zone_id"), z.get("seconds")
+        if zid and isinstance(sec, (int, float)) and sec > 0:
+            prog["z"][zid] = prog["z"].get(zid, 0) + int(round(sec))
+
+
+def prune_stats(stats: dict, today: date, keep_days: int = STATS_KEEP_DAYS) -> None:
+    cutoff = (today - timedelta(days=keep_days)).isoformat()
+    for key in [k for k in stats if k < cutoff]:
+        del stats[key]

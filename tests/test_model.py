@@ -171,3 +171,23 @@ def test_maps_normalisation():
     # a deleted sprinkler disappears from every map
     cfg2 = m.normalize_all({**cfg, "zones": []})
     assert cfg2["maps"][0]["shapes"] == {}
+
+
+def test_daily_stats_accumulate():
+    stats = {}
+    m.add_run_to_stats(stats, {"program_id": "p1", "status": "completed", "start": "2026-10-17T04:00:00-06:00",
+                               "zones": [{"zone_id": "z1", "seconds": 300}, {"zone_id": "z2", "seconds": 120.4}]})
+    m.add_run_to_stats(stats, {"program_id": "p1", "status": "stopped", "start": "2026-10-17T18:00:00-06:00",
+                               "zones": [{"zone_id": "z1", "seconds": 60}]})
+    m.add_run_to_stats(stats, {"program_id": "p1", "status": "skipped", "start": "2026-10-18T04:00:00-06:00",
+                               "reason": "condition:Lluvia ayer < 5 mm (sensor.precipitation_yesterday = 21.3)", "zones": []})
+    m.add_run_to_stats(stats, {"program_id": "p1", "status": "skipped", "start": "2026-10-18T18:00:00-06:00",
+                               "reason": "condition:Batería > 20 % (sensor.soc = 12)", "zones": []})
+    m.add_run_to_stats(stats, {"program_id": None, "status": "completed", "start": "2026-10-18T10:00:00-06:00",
+                               "zones": [{"zone_id": "z3", "seconds": 600}]})
+    day1 = stats["2026-10-17"]["p1"]
+    assert day1["z"] == {"z1": 360, "z2": 120} and day1["ok"] == 1 and day1["stop"] == 1
+    assert stats["2026-10-18"]["p1"]["rain"] == 1 and stats["2026-10-18"]["p1"]["cond"] == 1
+    assert stats["2026-10-18"][m.STATS_MANUAL]["z"] == {"z3": 600}
+    m.prune_stats(stats, date(2036, 10, 18), keep_days=3653)
+    assert "2026-10-17" not in stats and "2026-10-18" in stats

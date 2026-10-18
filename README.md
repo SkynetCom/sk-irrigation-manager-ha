@@ -95,6 +95,14 @@ Draw each sprinkler's area on your **drone photo, site plan or satellite imagery
 
 > 💡 Want to try the interface without installing anything? Open [`dev/demo.html`](https://github.com/SkynetCom/sk-irrigation-manager-ha/blob/main/dev/demo.html) from a local web server (see [Development](#-development)).
 
+## 📈 Watering report
+
+The Dashboard includes a report of how much each sprinkler, group and program has watered: **stacked bars per program**, lines for **completed and skipped cycles** (rain or conditions), and totals with the change versus the previous period. Group it by **day, week, month or year**, filter by program, group or sprinkler, and switch between watering time and estimated liters (from each sprinkler's flow rate).
+
+<p align="center"><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/report.png" alt="Watering report" width="100%"></p>
+
+Hover (or tap, on a phone) a bar to see that period in detail: totals on one side and **every sprinkler** on the other, in columns by controller, device or area. Daily totals are kept for **years** in their own file, separate from the run history, and the report starts filled with the history you already have.
+
 ## 🗺️ Map
 
 Upload a top-down **drone photo or a site plan** (or use **satellite** imagery), draw each sprinkler's area on it and watch the property live: the sprinkler that is watering glows with a ripple and a badge showing **how long it has been on** and how much is left; the next one is outlined, and the ones already done or not in this cycle are shown too. Tap an area to water it for 5, 10 or 15 minutes.

@@ -5,9 +5,10 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
 
 from .const import STORAGE_KEY, STORAGE_VERSION
-from .model import normalize_all
+from .model import add_run_to_stats, normalize_all, prune_stats
 
 SAVE_DELAY = 2
 
@@ -17,6 +18,10 @@ class IrrigationStore:
 
     def __init__(self, hass: HomeAssistant) -> None:
         self._store: Store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+        # Daily totals for the Dashboard report live in their own file: they are
+        # kept for years, while the run history is capped at a few hundred runs.
+        self._stats_store: Store = Store(hass, 1, f"{STORAGE_KEY}.stats")
+        self.stats: dict[str, dict] = {}
         self.config: dict = normalize_all({})
         self.history: list[dict] = []
         self.zone_stats: dict[str, dict] = {}
@@ -28,6 +33,16 @@ class IrrigationStore:
         self.history = data.get("history", [])
         self.zone_stats = data.get("zone_stats", {})
         self.interrupted = bool(data.get("interrupted", False))
+        stats = await self._stats_store.async_load()
+        if stats is None:
+            # first start with this version: seed the report from the stored history
+            self.stats = {}
+            for entry in reversed(self.history):
+                add_run_to_stats(self.stats, entry)
+            if self.stats:
+                self._stats_store.async_delay_save(self._stats_data, SAVE_DELAY)
+        else:
+            self.stats = stats.get("days", {})
 
     def _data(self) -> dict:
         return {
@@ -62,6 +77,12 @@ class IrrigationStore:
         self.history.insert(0, entry)
         del self.history[self.config["settings"]["history_size"]:]
         self.schedule_save()
+        add_run_to_stats(self.stats, entry)
+        prune_stats(self.stats, dt_util.now().date())
+        self._stats_store.async_delay_save(self._stats_data, SAVE_DELAY)
+
+    def _stats_data(self) -> dict:
+        return {"days": self.stats}
 
     def update_zone_stat(self, zone_id: str, end_iso: str, seconds: int) -> None:
         stat = self.zone_stats.setdefault(zone_id, {"last": None, "last_seconds": 0, "total_seconds": 0})

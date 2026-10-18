@@ -25,6 +25,7 @@ def async_register_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_subscribe)
     websocket_api.async_register_command(hass, ws_save)
     websocket_api.async_register_command(hass, ws_import)
+    websocket_api.async_register_command(hass, ws_stats)
     websocket_api.async_register_command(hass, ws_action)
     websocket_api.async_register_command(hass, ws_check_conditions)
 
@@ -175,3 +176,18 @@ def ws_check_conditions(hass: HomeAssistant, connection: websocket_api.ActiveCon
         ok, detail = engine.evaluate(cond)
         out.append({"id": raw.get("id") if isinstance(raw, dict) else None, "ok": ok, "detail": detail})
     connection.send_result(msg["id"], out)
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/stats",
+    vol.Optional("since"): str,
+})
+@callback
+def ws_stats(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Daily watering totals per program and sprinkler, for the Dashboard report."""
+    engine = _engine(hass)
+    if not engine:
+        return _not_loaded(connection, msg)
+    since = msg.get("since") or ""
+    days = {k: v for k, v in engine.store.stats.items() if k >= since}
+    connection.send_result(msg["id"], {"days": days})

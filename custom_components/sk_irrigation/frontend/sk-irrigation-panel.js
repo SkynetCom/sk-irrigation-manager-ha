@@ -4,6 +4,7 @@
 import { I18N } from "./sk-irrigation-i18n.js?v=1.4.0";
 import { STYLES } from "./sk-irrigation-styles.js?v=1.4.0";
 import { MapMixin } from "./sk-irrigation-map.js?v=1.4.0";
+import { ReportMixin } from "./sk-irrigation-report.js?v=1.4.0";
 
 const DOMAIN = "sk_irrigation";
 const TABS = [
@@ -105,6 +106,7 @@ class SkIrrigationPanel extends HTMLElement {
     sr.addEventListener("pointerdown", (e) => this._onPointerDown(e));
     sr.addEventListener("pointermove", (e) => this._onPointerMove(e));
     sr.addEventListener("pointerup", (e) => this._onPointerUp(e));
+    sr.addEventListener("mousemove", (e) => { if (this._tab === "dashboard") this._repHover(e); });
     sr.addEventListener("pointercancel", () => { if (this._tl) this._tlCancel(); else this._cancelDrag(); });
     sr.addEventListener("keydown", (e) => {
       if (this._pk && (e.target.dataset?.bind === "pk-search" || e.target.dataset?.suggest || e.key === "Escape")) this._pkKey(e);
@@ -421,6 +423,7 @@ class SkIrrigationPanel extends HTMLElement {
   _render_dashboard() {
     const st = this._state;
     return `
+      <div class="stack" style="gap:16px">
       <div class="grid cols-main">
         <div class="stack" style="gap:16px">
           ${this._heroHtml()}
@@ -431,6 +434,8 @@ class SkIrrigationPanel extends HTMLElement {
           ${this._programsMiniHtml()}
           ${st.queue.length ? this._queueHtml() : ""}
         </div>
+      </div>
+      ${this._reportHtml()}
       </div>`;
   }
 
@@ -1537,6 +1542,9 @@ class SkIrrigationPanel extends HTMLElement {
   // ------------------------------------------------------------ events
   async _onClick(e) {
     if (this._justDragged) return;
+    const repBar = e.target.closest?.("[data-rep-i]");
+    if (repBar) { this._repShow(Number(repBar.dataset.repI), e, this.shadowRoot.getElementById("rep-chart")); return; }
+    if (this._repTipI != null && !e.target.closest?.(".rep-tip")) this._repHide();
     const el = e.target.closest("[data-action]");
     if (!el) return;
     if (el.classList.contains("scrim") && e.target.closest("[data-stop]")) return;
@@ -1545,6 +1553,7 @@ class SkIrrigationPanel extends HTMLElement {
     const n = el.dataset.n !== undefined ? Number(el.dataset.n) : null;
     const p = this._edit;
     if (a.startsWith("map-")) { await this._mapAction(a, el); return; }
+    if (a.startsWith("rep-")) { this._repAction(a, el); return; }
     switch (a) {
       case "pick": this._openPicker(el.dataset.pick, el); return;
       case "pk-close": this._closePicker(); return;
@@ -1864,6 +1873,7 @@ class SkIrrigationPanel extends HTMLElement {
         break;
       }
       case "dlgz": this._dialog.draft[a] = v; return;
+      case "rep": this._rep()[a] = v; this._repRefresh(); return;
       case "map": {
         const view = this._mapView();
         if (!view) return;
@@ -2095,6 +2105,7 @@ class SkIrrigationPanel extends HTMLElement {
 }
 
 Object.defineProperties(SkIrrigationPanel.prototype, Object.getOwnPropertyDescriptors(MapMixin));
+Object.defineProperties(SkIrrigationPanel.prototype, Object.getOwnPropertyDescriptors(ReportMixin));
 
 if (!customElements.get("sk-irrigation-panel")) {
   customElements.define("sk-irrigation-panel", SkIrrigationPanel);

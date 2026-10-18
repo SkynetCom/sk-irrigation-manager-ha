@@ -217,7 +217,30 @@ function evalCond(c) {
 }
 const condFailures = (list) => (list || []).map((c) => [c, evalCond(c)]).filter(([, r]) => !r.ok)
   .map(([c, r]) => `condition:${c.label || c.entity_id} (${r.detail})`);
+// ~15 months of simulated daily totals for the Dashboard report
+const statsDays = (() => {
+  const out = {}; let seed = 11; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const today = new Date(); const d = new Date(today); d.setDate(d.getDate() - 470);
+  for (; d <= today; d.setDate(d.getDate() + 1)) {
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const day = {}; const m = d.getMonth(); const wet = [4, 5, 8, 9, 10].includes(m) ? 0.4 : 0.12;
+    const morning = config.programs[0];
+    if ([1, 3, 5].includes(d.getDay())) {
+      const p = { z: {}, ok: 0, stop: 0, rain: 0, cond: 0 };
+      if (rnd() < wet) p.rain = 1; else if (rnd() < 0.04) p.cond = 1;
+      else { p.ok = 1; planProgram(morning).forEach((st) => st.zones.forEach((z) => { p.z[z.zone_id] = Math.round(z.seconds * (0.96 + rnd() * 0.08)); })); }
+      day.prog_morning = p;
+    }
+    if ([11, 0, 1].includes(m) && d.getDate() % 3 === 0) {
+      day.prog_summer = { z: Object.fromEntries(["zone_5", "zone_6", "zone_7"].map((z) => [z, 300])), ok: 1, stop: 0, rain: 0, cond: 0 };
+    }
+    if (rnd() < 0.08) day._manual = { z: { [`zone_${1 + Math.floor(rnd() * 7)}`]: 300 + Math.round(rnd() * 600) }, ok: 1, stop: 0, rain: 0, cond: 0 };
+    if (Object.keys(day).length) out[key] = day;
+  }
+  return out;
+})();
 const handlers = {
+  "sk_irrigation/stats": () => ({ days: statsDays }),
   "sk_irrigation/check_conditions": (m) => m.conditions.map((c) => ({ id: c.id, ...evalCond(c) })),
   "sk_irrigation/data": () => ({ version: "1.0.0-demo", config, state: state(), candidates, is_admin: true }),
   "sk_irrigation/save": (m) => {
@@ -290,6 +313,11 @@ setTimeout(async () => {
   if (qs.get("mapedit")) { panel._mapEdit = true; panel._mapSel = qs.get("mapedit") === "1" ? null : qs.get("mapedit"); }
   if (qs.get("edit") !== null) panel._edit = JSON.parse(JSON.stringify(panel._config.programs[Number(qs.get("edit"))]));
   panel._render();
+  if (qs.get("rep")) setTimeout(() => {  // ?rep=N opens the report detail of bar N (screenshots)
+    const sr = panel.shadowRoot; const chart = sr.getElementById("rep-chart"); chart.scrollIntoView({ block: "start" });
+    const bar = sr.querySelector(`.rh[data-rep-i="${qs.get("rep")}"]`); const r = bar.getBoundingClientRect();
+    panel._repShow(Number(qs.get("rep")), { clientX: r.left + r.width / 2, clientY: r.top + r.height * 0.45 }, chart);
+  }, 600);
 }, 400);
 </script>
 </body>

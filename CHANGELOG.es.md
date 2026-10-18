@@ -2,6 +2,14 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
+## Sin publicar
+- Nuevo **reporte de riego** en el Panel: barras apiladas por programa, ciclos completos y omitidos, indicadores con la
+  variación respecto del período anterior; agrupado por día, semana, mes o año; filtro por programa, grupo o aspersor;
+  tiempo o litros estimados. Pasá el mouse o tocá una barra para ver el detalle de ese período, con cada aspersor en
+  columnas (por controlador, dispositivo o área).
+- Los totales diarios por programa y aspersor se guardan por años en `.storage/sk_irrigation.data.stats` (nuevo comando
+  websocket `sk_irrigation/stats`) y se completan con el historial existente al primer arranque.
+
 ## 1.4.0 — 2026-10-17
 - Nueva pestaña **Mapa**: dibujá el área de cada aspersor sobre una foto de dron / plano o sobre la vista satelital y mirá en
   vivo cuál está regando (ondas de agua, tiempo transcurrido y restante), cuál sigue y cuáles ya regaron. Varios mapas (por

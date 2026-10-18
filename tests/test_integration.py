@@ -293,3 +293,18 @@ async def test_map_image_upload_serve_and_cleanup(hass, hass_client, tmp_path):
     # deleting the map deletes its image
     await engine.async_save("maps", [])
     assert not (tmp_path / DOMAIN / "maps" / name).exists()
+
+
+async def test_daily_stats_and_ws(hass, hass_ws_client):
+    _, engine = await _setup(hass)
+    await _configure(engine)
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 1, "type": f"{DOMAIN}/action", "action": "run_program", "target": "p1"})
+    assert (await client.receive_json())["success"]
+    await _wait_idle(hass, engine)
+    await client.send_json({"id": 2, "type": f"{DOMAIN}/stats"})
+    res = await client.receive_json()
+    days = res["result"]["days"]
+    assert len(days) == 1
+    prog = next(iter(days.values()))["p1"]
+    assert prog["ok"] >= 1 and set(prog["z"]) == {"z1", "z2", "z3", "z4"}
