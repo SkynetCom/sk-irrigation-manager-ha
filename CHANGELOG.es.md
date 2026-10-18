@@ -2,7 +2,7 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
-## Sin publicar
+## 1.5.1 — 2026-10-18
 - Reporte: el filtro **Ver** ahora es un panel con buscador y chips (programas, grupos y aspersores en columnas) en lugar de
   una lista desplegable larga; **Medir** pasa a ser Tiempo / Litros y explica cómo activar los litros si no hay caudal cargado.
 

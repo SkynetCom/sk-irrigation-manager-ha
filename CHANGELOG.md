@@ -2,7 +2,7 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
-## Unreleased
+## 1.5.1 — 2026-10-18
 - Report: the **Show** filter is now a searchable panel with chips (programs, groups and sprinklers in columns) instead of a
   long dropdown; **Measure** is a Time / Liters toggle that explains how to enable liters when no flow rate is set.
 
