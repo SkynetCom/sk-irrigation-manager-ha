@@ -44,7 +44,7 @@ import "../custom_components/sk_irrigation/frontend/sk-irrigation-panel.js";
 
 // Mock data follows the demo language (?lang=en) so screenshots stay consistent.
 const L = (es, en) => (new URLSearchParams(location.search).get("lang") === "en" ? en : es);
-const SPEED = 30; // demo time runs 30x faster
+const SPEED = Number(new URLSearchParams(location.search).get("speed")) || 30; // demo time runs 30x faster (?speed=N)
 const pad = (n) => String(n).padStart(2, "0");
 const iso = (ms) => new Date(ms).toISOString();
 const states = {};
