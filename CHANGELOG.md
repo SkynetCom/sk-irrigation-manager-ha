@@ -2,6 +2,10 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
+## Unreleased
+- Report: the **Show** filter is now a searchable panel with chips (programs, groups and sprinklers in columns) instead of a
+  long dropdown; **Measure** is a Time / Liters toggle that explains how to enable liters when no flow rate is set.
+
 ## 1.5.0 — 2026-10-18
 - New **watering report** on the Dashboard: stacked bars per program, completed and skipped cycles, KPIs with the change
   versus the previous period; group by day, week, month or year; filter by program, group or sprinkler; time or estimated

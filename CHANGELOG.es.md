@@ -2,6 +2,10 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
+## Sin publicar
+- Reporte: el filtro **Ver** ahora es un panel con buscador y chips (programas, grupos y aspersores en columnas) en lugar de
+  una lista desplegable larga; **Medir** pasa a ser Tiempo / Litros y explica cómo activar los litros si no hay caudal cargado.
+
 ## 1.5.0 — 2026-10-18
 - Nuevo **reporte de riego** en el Panel: barras apiladas por programa, ciclos completos y omitidos, indicadores con la
   variación respecto del período anterior; agrupado por día, semana, mes o año; filtro por programa, grupo o aspersor;

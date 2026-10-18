@@ -109,6 +109,11 @@ class SkIrrigationPanel extends HTMLElement {
     sr.addEventListener("mousemove", (e) => { if (this._tab === "dashboard") this._repHover(e); });
     sr.addEventListener("pointercancel", () => { if (this._tl) this._tlCancel(); else this._cancelDrag(); });
     sr.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && this._repState?.fopen) { this._repFilterClose(); return; }
+      if (e.key === "Enter" && e.target.dataset?.bind === "rep-q") {
+        e.target.closest(".rep-pop")?.querySelector("[data-action=rep-fset]")?.click();
+        return;
+      }
       if (this._pk && (e.target.dataset?.bind === "pk-search" || e.target.dataset?.suggest || e.key === "Escape")) this._pkKey(e);
     });
     // Autocomplete: entity inputs with data-suggest open an inline suggestion list.
@@ -1545,6 +1550,7 @@ class SkIrrigationPanel extends HTMLElement {
     const repBar = e.target.closest?.("[data-rep-i]");
     if (repBar) { this._repShow(Number(repBar.dataset.repI), e, this.shadowRoot.getElementById("rep-chart")); return; }
     if (this._repTipI != null && !e.target.closest?.(".rep-tip")) this._repHide();
+    if (this._repState?.fopen && !e.target.closest?.(".rep-filter")) this._repFilterClose();
     const el = e.target.closest("[data-action]");
     if (!el) return;
     if (el.classList.contains("scrim") && e.target.closest("[data-stop]")) return;
@@ -1814,6 +1820,7 @@ class SkIrrigationPanel extends HTMLElement {
 
   _onInput(e) {
     const el = e.target;
+    if (el.dataset.bind === "rep-q") { this._repFilterInput(el); return; }
     if (el.dataset.suggest && this._pk?.inline) {
       this._pk.query = el.value.trim();
       this._pk.idx = 0;

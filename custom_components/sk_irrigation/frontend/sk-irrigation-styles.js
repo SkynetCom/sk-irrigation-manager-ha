@@ -444,6 +444,37 @@ path.ski-z.sel { stroke: #fff; stroke-width: 4; stroke-dasharray: none; fill-opa
 .map-pop .row { margin-top: 8px; gap: 6px; flex-wrap: wrap; }
 .map-pop .btn.sm { padding: 5px 10px; font-size: 13px; }
 /* ---------- dashboard report ---------- */
+.seg.sm button { padding: 5px 11px; }
+.seg button.dim { opacity: .55; }
+.rep-filter { position: relative; display: inline-block; }
+.rep-fbtn { display: inline-flex; align-items: center; gap: 6px; max-width: 280px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--ski-line);
+  background: var(--ski-card); cursor: pointer; font-size: 13px; color: var(--ski-text); }
+.rep-fbtn ha-icon { --mdc-icon-size: 17px; color: var(--ski-muted); }
+.rep-fbtn .tx { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.rep-fbtn .chev { transition: transform .15s; }
+.rep-fbtn.open { border-color: var(--ski-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ski-primary) 18%, transparent); }
+.rep-fbtn.open .chev { transform: rotate(180deg); }
+.rep-pop { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; width: min(640px, calc(100vw - 48px)); max-height: min(70vh, 520px); overflow: auto;
+  background: var(--ski-card); color: var(--ski-text); border: 1px solid var(--ski-line); border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,.22); padding: 10px 12px 12px; }
+.rep-search { position: sticky; top: -10px; z-index: 1; display: flex; align-items: center; gap: 8px; background: var(--ski-card); padding: 4px 0 8px; margin-top: -4px; }
+.rep-search ha-icon { --mdc-icon-size: 18px; color: var(--ski-muted); position: absolute; left: 10px; }
+.rep-search input { width: 100%; padding: 8px 10px 8px 34px; border-radius: 10px; border: 1px solid var(--ski-line); background: rgba(127,127,127,.06); outline: none; }
+.rep-search input:focus { border-color: var(--ski-primary); }
+.rf-sec { padding: 6px 0; border-top: 1px solid var(--ski-line); }
+.rf-sec:first-of-type { border-top: 0; }
+.rf-sec h6, .rf-col h6 { margin: 2px 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ski-muted); }
+.rf-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rf-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px 14px; }
+.rf-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; border: 1px solid var(--ski-line); background: var(--ski-card); border-radius: 99px;
+  padding: 4px 10px; font-size: 12.5px; cursor: pointer; color: var(--ski-text); }
+.rf-chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rf-chip i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.rf-chip ha-icon { --mdc-icon-size: 15px; color: var(--ski-muted); }
+.rf-chip:hover { border-color: color-mix(in srgb, var(--ski-primary) 55%, var(--ski-line)); }
+.rf-chip.on { background: color-mix(in srgb, var(--ski-primary) 14%, transparent); border-color: var(--ski-primary); color: var(--ski-primary); font-weight: 600; }
+.rf-none { padding: 14px; text-align: center; color: var(--ski-muted); }
+@media (max-width: 700px) { .rep-pop { position: fixed; left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; max-height: 75vh; } }
+.card.report { overflow: visible; }
 .report .hd { flex-wrap: wrap; row-gap: 8px; }
 .report .hd h2 { min-width: 200px; }
 .rep-nav { display: inline-flex; align-items: center; gap: 4px; }

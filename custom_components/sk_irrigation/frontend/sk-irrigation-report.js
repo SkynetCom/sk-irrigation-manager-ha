@@ -312,7 +312,6 @@ export const ReportMixin = {
     const legend = [...progs.map((p) => `<span class="${st.hide.has(p.id) ? "off" : ""}" data-action="rep-toggle" data-id="${esc(p.id)}"><i class="sw" style="background:${esc(p.color)}"></i>${esc(p.name)}</span>`),
       `<span class="${st.hide.has("ok") ? "off" : ""}" data-action="rep-toggle" data-id="ok"><i class="rr" style="border-color:#6c63ff"></i>${this.t("rep_k_ok")}</span>`,
       `<span class="${st.hide.has("sk") ? "off" : ""}" data-action="rep-toggle" data-id="sk"><i class="rr" style="border-color:#e5533d;border-style:dashed"></i>${this.t("rep_k_skipped")}</span>`].join("");
-    const opt = (v, label) => `<option value="${esc(v)}" ${st.flt === v ? "selected" : ""}>${esc(label)}</option>`;
     return `<div class="card report" id="ski-report">
       <div class="hd"><h2><ha-icon icon="mdi:chart-bar"></ha-icon>${this.t("rep_title")}</h2>
         <div class="seg">${["day", "week", "month", "year"].map((g) => `<button class="${st.g === g ? "on" : ""}" data-action="rep-group" data-id="${g}">${this.t(`rep_${g}`)}</button>`).join("")}</div>
@@ -321,13 +320,10 @@ export const ReportMixin = {
           <button class="btn icon" data-action="rep-next" ${hasNext ? "" : "disabled"}><ha-icon icon="mdi:chevron-right"></ha-icon></button></span>
       </div>
       <div class="rep-ctl">
-        <label class="rep-sel">${this.t("rep_show")} <select data-bind="rep:flt">${opt("all", this.t("rep_all"))}
-          <optgroup label="${esc(this.t("programs"))}">${this._programs.map((p) => opt(`p:${p.id}`, p.name)).join("")}${opt(`p:${MANUAL}`, this.t("rep_manual"))}</optgroup>
-          ${this._groups.length ? `<optgroup label="${esc(this.t("groups"))}">${this._groups.map((g) => opt(`g:${g.id}`, g.name)).join("")}</optgroup>` : ""}
-          <optgroup label="${esc(this.t("zones"))}">${this._zones.map((z) => opt(`z:${z.id}`, z.name)).join("")}</optgroup></select></label>
-        <label class="rep-sel">${this.t("rep_measure")} <select data-bind="rep:met" ${hasFlow ? "" : "disabled"}>
-          <option value="min" ${met === "min" ? "selected" : ""}>${esc(this.t("rep_axis_time"))}</option>
-          <option value="l" ${met === "l" ? "selected" : ""}>${esc(this.t("rep_k_water"))}</option></select></label>
+        <span class="rep-sel">${this.t("rep_show")} ${this._repFilterHtml()}</span>
+        <span class="rep-sel">${this.t("rep_measure")} <span class="seg sm">
+          <button class="${met === "min" ? "on" : ""}" data-action="rep-met" data-id="min">${this.t("rep_m_time")}</button>
+          <button class="${met === "l" ? "on" : ""} ${hasFlow ? "" : "dim"}" data-action="rep-met" data-id="l" title="${hasFlow ? "" : esc(this.t("rep_no_flow_tip"))}">${this.t("rep_m_water")}</button></span></span>
         <span class="small muted">${this.t("rep_hover_hint")}</span>
       </div>
       <div class="rep-kpis">${kpis.map(([k, v, s]) => `<div class="kpi"><span>${k}</span><b>${v}</b>${s}</div>`).join("")}</div>
@@ -338,6 +334,65 @@ export const ReportMixin = {
         <div class="rep-tip" id="rep-tip"></div>
       </div>
     </div>`;
+  },
+
+  // ------------------------------------------------------------ "Show" filter (searchable chips)
+  _repFilterLabel() {
+    const f = this._rep().flt;
+    if (f === "all") return { icon: "mdi:select-all", text: this.t("rep_all") };
+    if (f.startsWith("p:")) {
+      const id = f.slice(2);
+      return { icon: "mdi:calendar-clock", text: id === MANUAL ? this.t("rep_manual") : this._programs.find((p) => p.id === id)?.name || "?" };
+    }
+    if (f.startsWith("g:")) return { icon: "mdi:vector-arrange-below", text: this._group(f.slice(2))?.name || "?" };
+    return { icon: "mdi:sprinkler", text: this._zone(f.slice(2))?.name || "?" };
+  },
+
+  _repFilterHtml() {
+    const st = this._rep();
+    const cur = this._repFilterLabel();
+    return `<span class="rep-filter">
+      <button class="rep-fbtn ${st.fopen ? "open" : ""}" data-action="rep-fopen"><ha-icon icon="${cur.icon}"></ha-icon>
+        <span class="tx">${esc(cur.text)}</span><ha-icon class="chev" icon="mdi:chevron-down"></ha-icon></button>
+      ${st.fopen ? `<div class="rep-pop">
+        <div class="rep-search"><ha-icon icon="mdi:magnify"></ha-icon><input type="search" data-bind="rep-q" value="${esc(st.q || "")}" placeholder="${esc(this.t("rep_search"))}" autocomplete="off"></div>
+        <div class="rep-fl">${this._repFilterList()}</div></div>` : ""}
+    </span>`;
+  },
+
+  _repFilterList() {
+    const st = this._rep();
+    const q = (st.q || "").trim().toLowerCase();
+    const match = (txt) => !q || String(txt).toLowerCase().includes(q);
+    const chip = (v, label, color, icon) => `<button class="rf-chip ${st.flt === v ? "on" : ""}" data-action="rep-fset" data-id="${esc(v)}" title="${esc(label)}">
+      ${color ? `<i style="background:${esc(color)}"></i>` : icon ? `<ha-icon icon="${icon}"></ha-icon>` : ""}<span>${esc(label)}</span></button>`;
+    const section = (title, body) => (body ? `<div class="rf-sec"><h6>${esc(title)}</h6><div class="rf-chips">${body}</div></div>` : "");
+    const progs = [...this._programs.map((p) => [`p:${p.id}`, p.name, p.color]), [`p:${MANUAL}`, this.t("rep_manual"), MANUAL_COLOR]]
+      .filter(([, n]) => match(n)).map(([v, n, c]) => chip(v, n, c)).join("");
+    const groups = this._groups.filter((g) => match(g.name)).map((g) => chip(`g:${g.id}`, g.name, g.color)).join("");
+    const cols = this._repZoneColumns(this._zones);
+    const zones = cols.map((c) => {
+      const items = c.zones.filter((z) => match(z.name)).map((z) => chip(`z:${z.id}`, z.short, z.color)).join("");
+      return items ? `<div class="rf-col">${c.title ? `<h6>${esc(c.title)}</h6>` : ""}<div class="rf-chips">${items}</div></div>` : "";
+    }).join("");
+    const out = (match(this.t("rep_all")) ? `<div class="rf-sec"><div class="rf-chips">${chip("all", this.t("rep_all"), null, "mdi:select-all")}</div></div>` : "")
+      + section(this.t("programs"), progs) + section(this.t("groups"), groups)
+      + (zones ? `<div class="rf-sec"><h6>${esc(this.t("zones"))}</h6><div class="rf-cols">${zones}</div></div>` : "");
+    return out || `<div class="rf-none">${this.t("rep_no_match")}</div>`;
+  },
+
+  _repFilterInput(el) {
+    this._rep().q = el.value;
+    const list = this.shadowRoot.querySelector(".rep-fl");
+    if (list) list.innerHTML = this._repFilterList();
+  },
+
+  _repFilterClose() {
+    const st = this._rep();
+    if (!st.fopen) return;
+    st.fopen = false;
+    st.q = "";
+    this._repRefresh();
   },
 
   // ------------------------------------------------------------ hover / tap detail
@@ -425,6 +480,12 @@ export const ReportMixin = {
         break;
       case "rep-prev": st.off += 1; break;
       case "rep-next": st.off = Math.max(0, st.off - 1); break;
+      case "rep-met":
+        if (el.dataset.id === "l" && !this._zones.some((z) => Number(z.flow_rate) > 0)) { this._toast(this.t("rep_no_flow_tip")); return; }
+        st.met = el.dataset.id;
+        break;
+      case "rep-fopen": st.fopen = !st.fopen; st.q = ""; break;
+      case "rep-fset": st.flt = el.dataset.id; st.fopen = false; st.q = ""; break;
       case "rep-toggle": { const id = el.dataset.id; if (st.hide.has(id)) st.hide.delete(id); else st.hide.add(id); break; }
       default: return;
     }
@@ -433,6 +494,11 @@ export const ReportMixin = {
 
   _repRefresh() {
     const host = this.shadowRoot.getElementById("ski-report");
-    if (host) host.outerHTML = this._reportHtml();
+    if (!host) return;
+    host.outerHTML = this._reportHtml();
+    if (this._rep().fopen) {
+      const input = this.shadowRoot.querySelector(".rep-search input");
+      if (input && !matchMedia("(pointer: coarse)").matches) input.focus();
+    }
   },
 };
