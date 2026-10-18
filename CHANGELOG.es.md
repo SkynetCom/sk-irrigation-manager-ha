@@ -2,7 +2,7 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
-## Sin publicar
+## 1.5.0 — 2026-10-18
 - Nuevo **reporte de riego** en el Panel: barras apiladas por programa, ciclos completos y omitidos, indicadores con la
   variación respecto del período anterior; agrupado por día, semana, mes o año; filtro por programa, grupo o aspersor;
   tiempo o litros estimados. Pasá el mouse o tocá una barra para ver el detalle de ese período, con cada aspersor en

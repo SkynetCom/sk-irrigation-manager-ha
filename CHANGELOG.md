@@ -2,7 +2,7 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
-## Unreleased
+## 1.5.0 — 2026-10-18
 - New **watering report** on the Dashboard: stacked bars per program, completed and skipped cycles, KPIs with the change
   versus the previous period; group by day, week, month or year; filter by program, group or sprinkler; time or estimated
   liters. Hover or tap a bar for the full detail of that period, with every sprinkler in columns (by controller, device or area).
