@@ -2,7 +2,7 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
-## Unreleased
+## 1.5.3 — 2026-10-24
 - **Security:** the live condition check only renders Jinja templates for administrators; other users get results only for
   templates already saved in the configuration (as Home Assistant does for template rendering). Suggested by @frenck.
 - The panel notices when the browser still runs an older version after an update and shows a **Reload** button. It also

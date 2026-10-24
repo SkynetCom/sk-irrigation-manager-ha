@@ -2,7 +2,7 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
-## Sin publicar
+## 1.5.3 — 2026-10-24
 - **Seguridad:** la verificación en vivo de condiciones solo evalúa plantillas Jinja para administradores; los demás usuarios
   solo ven el resultado de plantillas que ya están guardadas en la configuración (como hace Home Assistant al evaluar
   plantillas). Sugerencia de @frenck.
