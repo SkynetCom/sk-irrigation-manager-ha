@@ -105,6 +105,7 @@ label.field > span { padding-left: 2px; }
 .badge.rb { background: #00693c; color: #fff; }
 .empty { text-align: center; color: var(--ski-muted); padding: 28px 12px; font-size: 14px; }
 .empty ha-icon { --mdc-icon-size: 40px; opacity: .5; display: block; margin: 0 auto 8px; }
+.banner.update { background: color-mix(in srgb, var(--ski-primary) 12%, var(--ski-card)); border: 1px solid color-mix(in srgb, var(--ski-primary) 40%, transparent); color: var(--ski-text); }
 .banner { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 10px; font-size: 14px; margin-bottom: 16px;
   background: color-mix(in srgb, var(--ski-amber) 14%, transparent); }
 

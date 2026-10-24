@@ -7,6 +7,8 @@ import { MapMixin } from "./sk-irrigation-map.js?v=1.5.2";
 import { ReportMixin } from "./sk-irrigation-report.js?v=1.5.2";
 
 const DOMAIN = "sk_irrigation";
+// Version of this file; compared with the installed integration to spot a stale browser cache.
+export const PANEL_VERSION = "1.5.2";
 const TABS = [
   ["dashboard", "mdi:view-dashboard-outline"],
   ["groups", "mdi:vector-arrange-below"],
@@ -188,11 +190,27 @@ class SkIrrigationPanel extends HTMLElement {
       this._setState(data.state);
       this._error = null;
       this._subscribe();
+      if (!this._readyListener) {
+        // after a Home Assistant restart (e.g. an update) re-read the data and the installed version
+        this._readyListener = () => this._reloadData();
+        this._hass.connection?.addEventListener?.("ready", this._readyListener);
+      }
     } catch (err) {
       console.error("SK Irrigation:", err);
       this._error = this.t("load_error");
     }
     this._render();
+  }
+
+  async _reloadData() {
+    try {
+      const data = await this._hass.callWS({ type: `${DOMAIN}/data` });
+      this._config = data.config;
+      this._candidates = data.candidates;
+      this._version = data.version;
+      this._setState(data.state);
+      this._render();
+    } catch (err) { /* the integration may still be starting */ }
   }
 
   _subscribe() {
@@ -365,6 +383,9 @@ class SkIrrigationPanel extends HTMLElement {
         <button class="tab ${this._tab === k ? "active" : ""}" data-action="tab" data-id="${k}">
           <ha-icon icon="${icon}"></ha-icon>${this.t(`tab_${k}`)}</button>`).join("")}</nav>
       <div class="scroller"><main>
+        ${this._version && this._version !== PANEL_VERSION ? `<div class="banner update"><ha-icon icon="mdi:update"></ha-icon>
+          <span style="flex:1">${this.t("update_reload", { v: esc(this._version) })}</span>
+          <button class="btn primary sm" data-action="reload-panel"><ha-icon icon="mdi:refresh"></ha-icon>${this.t("reload")}</button></div>` : ""}
         ${this._config && !this._can() ? `<div class="banner"><ha-icon icon="mdi:lock-outline"></ha-icon>${this.t("read_only")}</div>` : ""}
         ${body}</main></div>
       ${this._dialog ? this._dialogHtml() : ""}`;
@@ -1090,6 +1111,7 @@ class SkIrrigationPanel extends HTMLElement {
 
   _condBadge(r) {
     if (!r) return `<span class="badge">…</span>`;
+    if (r.detail === "admin_only") return `<span class="badge"><ha-icon icon="mdi:lock-outline" style="--mdc-icon-size:14px"></ha-icon>${this.t("cond_admin_only")}</span>`;
     const detail = r.detail ? `<span class="small muted">${esc(r.detail.replace(/^= /, ""))}</span>` : "";
     return r.ok
       ? `<span class="badge green"><ha-icon icon="mdi:check" style="--mdc-icon-size:14px"></ha-icon>${this.t("cond_ok")}</span>${detail}`
@@ -1558,6 +1580,7 @@ class SkIrrigationPanel extends HTMLElement {
     const id = el.dataset.id;
     const n = el.dataset.n !== undefined ? Number(el.dataset.n) : null;
     const p = this._edit;
+    if (a === "reload-panel") { location.reload(); return; }
     if (a.startsWith("map-")) { await this._mapAction(a, el); return; }
     if (a.startsWith("rep-")) { this._repAction(a, el); return; }
     switch (a) {

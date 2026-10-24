@@ -275,6 +275,13 @@ class IrrigationEngine:
                 pass
         return float(self.settings.get("global_budget", 100))
 
+    def stored_templates(self) -> set[str]:
+        """Templates of the saved global and per-program conditions."""
+        conds = list(self.settings.get("conditions", []))
+        for program in self.config["programs"]:
+            conds.extend(program.get("conditions", []))
+        return {c["template"].strip() for c in conds if c.get("type") == COND_TEMPLATE and c.get("template", "").strip()}
+
     def evaluate(self, cond: dict) -> tuple[bool, str]:
         """Evaluate one custom condition against the live HA state."""
         if cond["type"] == COND_TEMPLATE:

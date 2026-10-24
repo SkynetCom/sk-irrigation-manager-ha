@@ -2,6 +2,15 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
+## Sin publicar
+- **Seguridad:** la verificación en vivo de condiciones solo evalúa plantillas Jinja para administradores; los demás usuarios
+  solo ven el resultado de plantillas que ya están guardadas en la configuración (como hace Home Assistant al evaluar
+  plantillas). Sugerencia de @frenck.
+- El panel detecta cuando el navegador sigue con una versión vieja después de una actualización y muestra un botón
+  **Recargar**. También vuelve a leer sus datos cuando Home Assistant se reconecta después de un reinicio.
+- Ya está en la **tienda oficial de HACS**: instrucciones de instalación y badge actualizados (no hace falta repositorio personalizado).
+- Se quitó `strings.json`, que las integraciones personalizadas no usan (las traducciones están en `translations/`).
+
 ## 1.5.2 — 2026-10-24
 - **Seguridad:** las imágenes de los mapas (fotos de dron / planos) ya no se sirven desde una ruta estática sin autenticación.
   Ahora las entrega una vista autenticada (`/api/sk_irrigation/map_image/<archivo>`, solo archivos generados por la integración)

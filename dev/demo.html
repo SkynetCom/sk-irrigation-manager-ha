@@ -40,7 +40,7 @@
 <body>
 <div id="ctl"><button onclick="document.body.classList.toggle('dark')">🌓</button><button onclick="setLang()">ES/EN</button></div>
 <script type="module">
-import "../custom_components/sk_irrigation/frontend/sk-irrigation-panel.js";
+import { PANEL_VERSION } from "../custom_components/sk_irrigation/frontend/sk-irrigation-panel.js";
 
 // Mock data follows the demo language (?lang=en) so screenshots stay consistent.
 const L = (es, en) => (new URLSearchParams(location.search).get("lang") === "en" ? en : es);
@@ -243,7 +243,7 @@ const handlers = {
   "sk_irrigation/stats": () => ({ days: statsDays }),
   "auth/sign_path": (m) => ({ path: `${m.path}?authSig=demo` }),
   "sk_irrigation/check_conditions": (m) => m.conditions.map((c) => ({ id: c.id, ...evalCond(c) })),
-  "sk_irrigation/data": () => ({ version: "1.0.0-demo", config, state: state(), candidates, is_admin: true }),
+  "sk_irrigation/data": () => ({ version: new URLSearchParams(location.search).get("installed") || PANEL_VERSION, config, state: state(), candidates, is_admin: true }),
   "sk_irrigation/save": (m) => {
     const v = JSON.parse(JSON.stringify(m.value));
     if (m.key === "layout") Object.assign(config, v); else config[m.key] = v;
@@ -278,7 +278,7 @@ const hass = {
     ? { ok: true, json: async () => ({ url: URL.createObjectURL(opts.body.get("file")) }) }
     : fetch(url)),
   callWS: async (msg) => { await new Promise((r) => setTimeout(r, 60)); return JSON.parse(JSON.stringify(handlers[msg.type](msg))); },
-  connection: { subscribeMessage: async (cb) => { listeners.add(cb); return () => listeners.delete(cb); } },
+  connection: { subscribeMessage: async (cb) => { listeners.add(cb); return () => listeners.delete(cb); }, addEventListener: () => {} },
 };
 window.setLang = () => { const u = new URL(location); u.searchParams.set("lang", hass.language === "es" ? "en" : "es"); location = u; };
 const qs0 = new URLSearchParams(location.search);

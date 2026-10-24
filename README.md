@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/SkynetCom/sk-irrigation-manager-ha/releases"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FSkynetCom%2Fsk-irrigation-manager-ha%2Fmain%2Fcustom_components%2Fsk_irrigation%2Fmanifest.json&query=%24.version&prefix=v&label=version&color=1e88e5&cacheSeconds=3600" alt="Version"></a>
-  <a href="https://hacs.xyz/docs/faq/custom_repositories"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS"></a>
+  <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=SkynetCom&repository=sk-irrigation-manager-ha&category=integration"><img src="https://img.shields.io/badge/HACS-Default-41BDF5.svg" alt="HACS Default"></a>
   <img src="https://img.shields.io/badge/Home%20Assistant-2024.11%2B-18bcf2?logo=homeassistant&logoColor=white" alt="Home Assistant">
   <a href="https://github.com/SkynetCom/sk-irrigation-manager-ha/actions/workflows/validate.yml"><img src="https://github.com/SkynetCom/sk-irrigation-manager-ha/actions/workflows/validate.yml/badge.svg" alt="Validate"></a>
   <img src="https://img.shields.io/badge/languages-EN%20%7C%20ES-2e9e6b" alt="Languages">
@@ -149,9 +149,9 @@ columns: 3
 ## 🚀 Installation
 
 ### HACS (recommended)
-1. Click the **Open in HACS** button above, or in HACS → ⋮ → **Custom repositories** add
-   `https://github.com/SkynetCom/sk-irrigation-manager-ha` with the **Integration** category.
-2. Install **SK Irrigation Manager** and **restart Home Assistant**.
+SK Irrigation Manager is part of the **HACS default store** (and of the built-in **Marketplace** from Home Assistant 2026.11).
+1. Click the **Open in HACS** button above, or open HACS and search for **SK Irrigation Manager**.
+2. **Download** it and **restart Home Assistant**.
 3. **Settings → Devices & services → + Add integration → SK Irrigation Manager** (or the **Add integration** button above).
 4. **Irrigation** appears in the sidebar. If you don't see it, reload the browser with Ctrl+F5.
 

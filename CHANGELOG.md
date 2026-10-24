@@ -2,6 +2,14 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
+## Unreleased
+- **Security:** the live condition check only renders Jinja templates for administrators; other users get results only for
+  templates already saved in the configuration (as Home Assistant does for template rendering). Suggested by @frenck.
+- The panel notices when the browser still runs an older version after an update and shows a **Reload** button. It also
+  re-reads its data when Home Assistant reconnects after a restart.
+- Now in the **HACS default store**: install instructions and badge updated (no custom repository needed).
+- Removed `strings.json`, which custom integrations don't use (translations live in `translations/`).
+
 ## 1.5.2 — 2026-10-24
 - **Security:** map images (drone photos / site plans) are no longer served from an unauthenticated static path. They are served
   by an authenticated view (`/api/sk_irrigation/map_image/<file>`, only files the integration generated) and the panel loads them

@@ -320,3 +320,23 @@ async def test_daily_stats_and_ws(hass, hass_ws_client):
     assert len(days) == 1
     prog = next(iter(days.values()))["p1"]
     assert prog["ok"] >= 1 and set(prog["z"]) == {"z1", "z2", "z3", "z4"}
+
+
+async def test_check_conditions_templates_admin_only(hass, hass_ws_client, hass_read_only_access_token):
+    _, engine = await _setup(hass)
+    await engine.async_save("settings", {**engine.settings, "conditions": [
+        {"id": "c1", "type": "template", "template": "{{ 1 == 1 }}"}]})
+    stored = {"id": "a", "type": "template", "template": "{{ 1 == 1 }}"}
+    new = {"id": "b", "type": "template", "template": "{{ 2 == 2 }}"}
+    numeric = {"id": "c", "type": "numeric", "entity_id": "sensor.soc", "above": 20}
+    # a non-admin only gets results for templates already saved in the configuration
+    user = await hass_ws_client(hass, access_token=hass_read_only_access_token)
+    await user.send_json({"id": 1, "type": f"{DOMAIN}/check_conditions", "conditions": [stored, new, numeric]})
+    res = {r["id"]: r for r in (await user.receive_json())["result"]}
+    assert res["a"]["ok"] is True
+    assert res["b"] == {"id": "b", "ok": False, "detail": "admin_only"}
+    assert res["c"]["ok"] is True
+    # an admin can test any template while editing
+    admin = await hass_ws_client(hass)
+    await admin.send_json({"id": 1, "type": f"{DOMAIN}/check_conditions", "conditions": [new]})
+    assert (await admin.receive_json())["result"][0]["ok"] is True

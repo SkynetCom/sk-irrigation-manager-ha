@@ -9,7 +9,7 @@ from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .const import DOMAIN, SIGNAL_PROGRAMS_CHANGED, VERSION
+from .const import COND_TEMPLATE, DOMAIN, SIGNAL_PROGRAMS_CHANGED, VERSION
 from .engine import ConditionBlocked, IrrigationEngine
 from .maps import async_cleanup_images
 from .model import normalize_conditions
@@ -171,9 +171,15 @@ def ws_check_conditions(hass: HomeAssistant, connection: websocket_api.ActiveCon
     engine = _engine(hass)
     if not engine:
         return _not_loaded(connection, msg)
+    # Rendering arbitrary Jinja is admin-only in Home Assistant: other users only
+    # get results for templates that are already part of the saved configuration.
+    stored = None if connection.user.is_admin else engine.stored_templates()
     out = []
     for raw, cond in zip(msg["conditions"], normalize_conditions(msg["conditions"])):
-        ok, detail = engine.evaluate(cond)
+        if stored is not None and cond["type"] == COND_TEMPLATE and cond["template"].strip() not in stored:
+            ok, detail = False, "admin_only"
+        else:
+            ok, detail = engine.evaluate(cond)
         out.append({"id": raw.get("id") if isinstance(raw, dict) else None, "ok": ok, "detail": detail})
     connection.send_result(msg["id"], out)
 
