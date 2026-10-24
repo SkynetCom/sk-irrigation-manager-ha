@@ -153,7 +153,7 @@ def test_maps_normalisation():
     cfg = m.normalize_all({
         "zones": [{"id": "z1", "name": "A", "entity_id": "switch.a"}],
         "maps": [
-            {"id": "m1", "name": "Plan", "kind": "image", "image": "/sk_irrigation_files/maps/abc.jpg", "image_w": 1600, "image_h": 1000,
+            {"id": "m1", "name": "Plan", "kind": "image", "image": "/sk_irrigation_files/maps/0123456789abcdef0123456789abcdef.jpg", "image_w": 1600, "image_h": 1000,
              "shapes": {
                  "z1": [[[0.1, 0.1], [0.1, 0.2], [0.2, 0.2]], [[0.5, 0.5], [0.6, 0.6]]],  # 2nd part has < 3 points
                  "ghost": [[[0.1, 0.1], [0.1, 0.2], [0.2, 0.2]]],
@@ -164,10 +164,14 @@ def test_maps_normalisation():
     })
     plan, sat = cfg["maps"]
     assert plan["shapes"] == {"z1": [[[0.1, 0.1], [0.1, 0.2], [0.2, 0.2]]]}
-    assert plan["image"] == "/sk_irrigation_files/maps/abc.jpg"
+    # images from v1.4.0-v1.5.1 (static path) move to the authenticated view
+    assert plan["image"] == "/api/sk_irrigation/map_image/0123456789abcdef0123456789abcdef.jpg"
     assert sat["kind"] == "satellite" and sat["image"] == "" and sat["center"] == [9.6493, -85.1497]
     assert len(sat["shapes"]["z1"][0]) == 3
-    assert m.map_image_files(cfg["maps"]) == {"abc.jpg"}
+    assert m.map_image_files(cfg["maps"]) == {"0123456789abcdef0123456789abcdef.jpg"}
+    # anything else under the old static path, or a path traversal, is dropped
+    odd = m.normalize_all({"maps": [{"image": "/api/sk_irrigation/map_image/../../secrets.yaml"}]})
+    assert odd["maps"][0]["image"] == ""
     # a deleted sprinkler disappears from every map
     cfg2 = m.normalize_all({**cfg, "zones": []})
     assert cfg2["maps"][0]["shapes"] == {}

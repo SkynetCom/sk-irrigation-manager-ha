@@ -8,7 +8,8 @@ const LEAFLET_VERSION = "1.9.4";
 const SATELLITE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const SATELLITE_ATTRIBUTION = "Imagery © Esri, Maxar, Earthstar Geographics";
 const UPLOAD_URL = "/api/sk_irrigation/map_image";
-const FILES_PREFIX = "/sk_irrigation_files/";
+const FILES_PREFIX = "/api/sk_irrigation/map_image/";
+const SIGNED_URL_SECONDS = 300;
 const MAX_IMAGE_SIDE = 4096;
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -265,13 +266,26 @@ export const MapMixin = {
     const view = this._mapView();
     if (!view) return;
     const sig = [view.id, view.kind, view.image, view.image_w, view.image_h, view.max_native_zoom].join("|");
-    if (!this._lmap || this._mapSig !== sig) this._mapBuild(view, sig);
+    if (!this._lmap || this._mapSig !== sig) {
+      // uploaded images require authentication; Leaflet loads them through a short-lived signed URL
+      let imageUrl = view.image;
+      if (view.kind === "image" && imageUrl.startsWith(FILES_PREFIX)) {
+        try {
+          imageUrl = (await this._hass.callWS({ type: "auth/sign_path", path: imageUrl, expires: SIGNED_URL_SECONDS })).path;
+        } catch (err) {
+          imageUrl = "";
+        }
+        if (!this._mapHost.isConnected || this._mapView()?.id !== view.id) return;
+      }
+      // another attach may have built it while this one waited for the signature
+      if (!this._lmap || this._mapSig !== sig) this._mapBuild(view, sig, imageUrl);
+    }
     else this._lmap.invalidateSize();
     this._mapDrawShapes();
     this._mapOverlay(view);
   },
 
-  _mapBuild(view, sig) {
+  _mapBuild(view, sig, imageUrl = view.image) {
     const L = this._L;
     if (this._lmap) { this._lmap.remove(); this._lmap = null; }
     const el = this._mapHost.querySelector(".map-el");
@@ -285,7 +299,7 @@ export const MapMixin = {
       const bounds = L.latLngBounds([0, 0], [h, w]);
       const map = L.map(el, { crs: L.CRS.Simple, minZoom: -4, maxZoom: 4, zoomSnap: 0.25, zoomDelta: 0.5,
         attributionControl: false, maxBounds: bounds.pad(0.3) });
-      if (view.image) L.imageOverlay(view.image, bounds).addTo(map);
+      if (imageUrl) L.imageOverlay(imageUrl, bounds).addTo(map);
       map.fitBounds(bounds);
       this._lmap = map;
     } else {
@@ -700,7 +714,7 @@ export const MapMixin = {
     for (const m of config.maps || []) {
       if (!m.image || !m.image.startsWith(FILES_PREFIX)) continue;
       try {
-        const blob = await (await fetch(m.image)).blob();
+        const blob = await (await this._hass.fetchWithAuth(m.image)).blob();
         m.image_data = await blobToDataUrl(blob);
       } catch (err) { /* keep the url only */ }
     }

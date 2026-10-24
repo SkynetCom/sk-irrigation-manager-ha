@@ -2,6 +2,12 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
+## Unreleased
+- **Security:** map images (drone photos / site plans) are no longer served from an unauthenticated static path. They are served
+  by an authenticated view (`/api/sk_irrigation/map_image/<file>`, only files the integration generated) and the panel loads them
+  through a short-lived signed URL (`auth/sign_path`). Backup export downloads them with authentication. Existing maps are
+  migrated automatically. Thanks to @frenck for the review.
+
 ## 1.5.1 — 2026-10-18
 - Report: the **Show** filter is now a searchable panel with chips (programs, groups and sprinklers in columns) instead of a
   long dropdown; **Measure** is a Time / Liters toggle that explains how to enable liters when no flow rate is set.

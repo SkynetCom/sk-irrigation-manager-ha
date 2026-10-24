@@ -241,6 +241,7 @@ const statsDays = (() => {
 })();
 const handlers = {
   "sk_irrigation/stats": () => ({ days: statsDays }),
+  "auth/sign_path": (m) => ({ path: `${m.path}?authSig=demo` }),
   "sk_irrigation/check_conditions": (m) => m.conditions.map((c) => ({ id: c.id, ...evalCond(c) })),
   "sk_irrigation/data": () => ({ version: "1.0.0-demo", config, state: state(), candidates, is_admin: true }),
   "sk_irrigation/save": (m) => {
@@ -273,7 +274,9 @@ const hass = {
   language: new URLSearchParams(location.search).get("lang") || "es",
   states, services: { notify: { mobile_app_iphone: {}, telegram: {} } },
   config: { latitude: 40.4153, longitude: -3.6845 },
-  fetchWithAuth: async (url, opts) => ({ ok: true, json: async () => ({ url: URL.createObjectURL(opts.body.get("file")) }) }),
+  fetchWithAuth: async (url, opts) => (opts?.body
+    ? { ok: true, json: async () => ({ url: URL.createObjectURL(opts.body.get("file")) }) }
+    : fetch(url)),
   callWS: async (msg) => { await new Promise((r) => setTimeout(r, 60)); return JSON.parse(JSON.stringify(handlers[msg.type](msg))); },
   connection: { subscribeMessage: async (cb) => { listeners.add(cb); return () => listeners.delete(cb); } },
 };

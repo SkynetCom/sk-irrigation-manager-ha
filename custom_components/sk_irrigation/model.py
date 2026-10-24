@@ -298,7 +298,9 @@ def normalize_settings(raw: dict | None) -> dict:
 
 MAP_KIND_IMAGE = "image"
 MAP_KIND_SATELLITE = "satellite"
-_MAP_IMAGE_RE = re.compile(r"^/sk_irrigation_files/maps/[A-Za-z0-9_.-]+$|^https?://\S+$|^/local/\S+$")
+MAP_IMAGE_PREFIX = "/api/sk_irrigation/map_image/"
+_LEGACY_IMAGE_PREFIX = "/sk_irrigation_files/maps/"  # v1.4.0 - v1.5.1 served it as a static path
+_MAP_IMAGE_RE = re.compile(r"^/api/sk_irrigation/map_image/[0-9a-f]{32}\.(jpg|png|webp)$|^https?://\S+$|^/local/\S+$")
 
 
 def _point(raw: Any, kind: str) -> list[float] | None:
@@ -318,6 +320,8 @@ def normalize_map(raw: dict, zone_ids: set[str]) -> dict:
     """A map view: a background (drone photo or satellite) plus zone outlines."""
     kind = MAP_KIND_SATELLITE if raw.get("kind") == MAP_KIND_SATELLITE else MAP_KIND_IMAGE
     image = _str(raw.get("image"))
+    if image.startswith(_LEGACY_IMAGE_PREFIX):
+        image = MAP_IMAGE_PREFIX + image[len(_LEGACY_IMAGE_PREFIX):]
     shapes: dict[str, list] = {}
     for zid, parts in (raw.get("shapes") or {}).items():
         if zid not in zone_ids or not isinstance(parts, list):
@@ -346,8 +350,7 @@ def normalize_map(raw: dict, zone_ids: set[str]) -> dict:
 
 def map_image_files(maps: list[dict]) -> set[str]:
     """File names of uploaded images still referenced by a map."""
-    prefix = "/sk_irrigation_files/maps/"
-    return {m["image"][len(prefix):] for m in maps if m.get("image", "").startswith(prefix)}
+    return {m["image"][len(MAP_IMAGE_PREFIX):] for m in maps if m.get("image", "").startswith(MAP_IMAGE_PREFIX)}
 
 
 def normalize_all(data: dict) -> dict:

@@ -269,7 +269,7 @@ async def test_cards_registered_as_lovelace_resource(hass):
     assert [i["url"] for i in resources.async_items()] == []
 
 
-async def test_map_image_upload_serve_and_cleanup(hass, hass_client, tmp_path):
+async def test_map_image_upload_serve_and_cleanup(hass, hass_client, hass_ws_client, aiohttp_client, tmp_path):
     hass.config.config_dir = str(tmp_path)
     _, engine = await _setup(hass)
     client = await hass_client()
@@ -277,9 +277,21 @@ async def test_map_image_upload_serve_and_cleanup(hass, hass_client, tmp_path):
     resp = await client.post("/api/sk_irrigation/map_image", data={"file": io.BytesIO(png)})
     assert resp.status == 200
     url = (await resp.json())["url"]
-    assert url.startswith("/sk_irrigation_files/maps/") and url.endswith(".png")
+    assert url.startswith("/api/sk_irrigation/map_image/") and url.endswith(".png")
     served = await client.get(url)
     assert served.status == 200 and await served.read() == png
+    # never served without authentication...
+    anon = await aiohttp_client(hass.http.app)
+    assert (await anon.get(url)).status == 401
+    # ...except through a signed path, which is what the panel hands to Leaflet
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "auth/sign_path", "path": url, "expires": 60})
+    signed = (await ws.receive_json())["result"]["path"]
+    assert (await anon.get(signed)).status == 200
+    # only generated file names are served
+    assert (await client.get("/api/sk_irrigation/map_image/..%2F..%2Fsecrets.yaml")).status in (400, 404)
+    assert (await client.get("/api/sk_irrigation/map_image/secrets.yaml")).status == 404
+    assert (await client.get("/api/sk_irrigation/map_image/" + "0" * 32 + ".png")).status == 404
     # not an image -> rejected
     bad = await client.post("/api/sk_irrigation/map_image", data={"file": io.BytesIO(b"<script>")})
     assert bad.status == 415

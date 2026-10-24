@@ -12,7 +12,7 @@ PANEL_URL_PATH = "sk-irrigation"
 PANEL_COMPONENT = "sk-irrigation-panel"
 PANEL_ICON = "mdi:sprinkler-variant"
 STATIC_URL = "/sk_irrigation_static"
-FILES_URL = "/sk_irrigation_files"
+MAP_IMAGE_URL = "/api/sk_irrigation/map_image"
 
 CONF_SIDEBAR_TITLE = "sidebar_title"
 CONF_REQUIRE_ADMIN = "require_admin"

@@ -5,20 +5,24 @@ from http import HTTPStatus
 import logging
 import os
 from pathlib import Path
+import re
 import uuid
 
 from aiohttp import web
 
-from homeassistant.components.http import HomeAssistantView, StaticPathConfig
+from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN, FILES_URL
+from .const import DOMAIN, MAP_IMAGE_URL
 from .model import map_image_files
 
 _LOGGER = logging.getLogger(__name__)
 
 MAX_IMAGE_BYTES = 25 * 1024 * 1024
 _SIGNATURES = {b"\xff\xd8\xff": ".jpg", b"\x89PNG": ".png", b"RIFF": ".webp"}
+_CONTENT_TYPES = {".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
+# only the names this integration generates: no paths, no other files
+_NAME_RE = re.compile(r"^[0-9a-f]{32}\.(jpg|png|webp)$")
 
 
 def files_dir(hass: HomeAssistant) -> Path:
@@ -30,13 +34,16 @@ def maps_dir(hass: HomeAssistant) -> Path:
 
 
 async def async_register_files(hass: HomeAssistant) -> None:
-    """Serve uploaded map images and accept new uploads."""
+    """Accept uploads and serve map images, both only to authenticated users.
+
+    The images are top-down photos of people's properties, so they are never
+    exposed as a static path. The frontend loads them through a signed URL
+    (``auth/sign_path``) because Leaflet's image overlay can not send headers.
+    """
     folder = maps_dir(hass)
     await hass.async_add_executor_job(lambda: folder.mkdir(parents=True, exist_ok=True))
-    await hass.http.async_register_static_paths([
-        StaticPathConfig(FILES_URL, str(files_dir(hass)), cache_headers=True)
-    ])
     hass.http.register_view(MapImageView(hass))
+    hass.http.register_view(MapImageFileView(hass))
 
 
 def _extension(head: bytes) -> str | None:
@@ -49,7 +56,7 @@ def _extension(head: bytes) -> str | None:
 class MapImageView(HomeAssistantView):
     """POST a JPEG/PNG/WebP image; answers with the URL it is served from."""
 
-    url = "/api/sk_irrigation/map_image"
+    url = MAP_IMAGE_URL
     name = "api:sk_irrigation:map_image"
     requires_auth = True
 
@@ -81,7 +88,29 @@ class MapImageView(HomeAssistantView):
             path.write_bytes(bytes(data))
 
         await hass.async_add_executor_job(_write)
-        return self.json({"url": f"{FILES_URL}/maps/{name}"})
+        return self.json({"url": f"{MAP_IMAGE_URL}/{name}"})
+
+
+class MapImageFileView(HomeAssistantView):
+    """GET one uploaded map image (authenticated, or with a signed path)."""
+
+    url = MAP_IMAGE_URL + "/{name}"
+    name = "api:sk_irrigation:map_image:file"
+    requires_auth = True
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self.hass = hass
+
+    async def get(self, request: web.Request, name: str) -> web.StreamResponse:
+        if not _NAME_RE.match(name):
+            return web.Response(status=HTTPStatus.NOT_FOUND)
+        path = maps_dir(self.hass) / name
+        if not await self.hass.async_add_executor_job(path.is_file):
+            return web.Response(status=HTTPStatus.NOT_FOUND)
+        return web.FileResponse(path, headers={
+            "Content-Type": _CONTENT_TYPES[path.suffix],
+            "Cache-Control": "private, max-age=86400",
+        })
 
 
 async def async_cleanup_images(hass: HomeAssistant, maps: list[dict]) -> None:
