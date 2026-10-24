@@ -2,7 +2,7 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
-## Unreleased
+## 1.5.2 — 2026-10-24
 - **Security:** map images (drone photos / site plans) are no longer served from an unauthenticated static path. They are served
   by an authenticated view (`/api/sk_irrigation/map_image/<file>`, only files the integration generated) and the panel loads them
   through a short-lived signed URL (`auth/sign_path`). Backup export downloads them with authentication. Existing maps are

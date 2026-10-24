@@ -2,7 +2,7 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
-## Sin publicar
+## 1.5.2 — 2026-10-24
 - **Seguridad:** las imágenes de los mapas (fotos de dron / planos) ya no se sirven desde una ruta estática sin autenticación.
   Ahora las entrega una vista autenticada (`/api/sk_irrigation/map_image/<archivo>`, solo archivos generados por la integración)
   y el panel las carga con una URL firmada de corta duración (`auth/sign_path`). La exportación del respaldo las descarga con
