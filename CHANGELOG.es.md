@@ -2,7 +2,7 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
-## Sin publicar
+## 1.6.0 — 2026-10-26
 - **Corregido: un ciclo cortado podía desaparecer del historial y del reporte.** El ciclo en curso ahora se guarda después
   de cada aspersor; si Home Assistant se detiene, se reinicia o se cae a mitad de riego, en el próximo arranque queda
   registrado como **Interrumpido** con lo que llegó a regar. Además, el historial se escribe antes de cerrar las válvulas,

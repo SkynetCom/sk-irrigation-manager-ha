@@ -2,7 +2,7 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
-## Unreleased
+## 1.6.0 — 2026-10-26
 - **Fixed: a run cut short could disappear from the history and the report.** The run in progress is now saved after every
   sprinkler; if Home Assistant stops, restarts or crashes in the middle, the run is logged on the next start as
   **Interrupted** with what it watered. The history entry is also written before closing the valves, so a controller that
