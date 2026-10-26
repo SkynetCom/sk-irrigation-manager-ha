@@ -53,7 +53,8 @@ def async_register_services(hass: HomeAssistant) -> None:
         _guard(engine.enqueue_zone, zone, call.data["duration"], SOURCE_SERVICE)
 
     async def stop_all(call: ServiceCall) -> None:
-        await _engine(hass).async_stop_all()
+        engine = _engine(hass)
+        await engine.async_stop_all(await engine.describe_context(call.context))
 
     async def skip(call: ServiceCall) -> None:
         _engine(hass).skip(call.data.get("zone"))

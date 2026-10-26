@@ -120,7 +120,7 @@ export const ReportMixin = {
     const g = st.g;
     const days = this._repStats || {};
     const known = new Set(this._repPrograms().map((p) => p.id));
-    const now = new Date(this._now());
+    const now = parseDay(this._ymd(this._now()));  // today in Home Assistant's time zone
     const keys = Object.keys(days).sort();
     const first = keys.length ? parseDay(keys[0]) : now;
     // bucket list: from the first stored day to today (no gaps)
@@ -242,7 +242,8 @@ export const ReportMixin = {
     this._repState = prevState;
     const prev = sum(this._repBuckets().buckets);
     this._repState = saved;
-    const daysInWindow = buckets.length ? Math.max(1, Math.round((Math.min(this._now(), buckets.at(-1).end.getTime() + 864e5) - buckets[0].start.getTime()) / 864e5)) : 1;
+    const today = parseDay(this._ymd(this._now())).getTime();
+    const daysInWindow = buckets.length ? Math.max(1, Math.round((Math.min(today, buckets.at(-1).end.getTime()) - buckets[0].start.getTime()) / 864e5) + 1) : 1;
     const delta = (a, b) => {
       if (!b) return "";
       const d = Math.round(((a - b) / b) * 100);

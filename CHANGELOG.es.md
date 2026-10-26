@@ -2,6 +2,17 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
+## Sin publicar
+- **Corregido: un ciclo cortado podía desaparecer del historial y del reporte.** El ciclo en curso ahora se guarda después
+  de cada aspersor; si Home Assistant se detiene, se reinicia o se cae a mitad de riego, en el próximo arranque queda
+  registrado como **Interrumpido** con lo que llegó a regar. Además, el historial se escribe antes de cerrar las válvulas,
+  así que un controlador que no responde ya no puede hacer perder el registro.
+- Historial: **quién detuvo un ciclo y dónde** — el usuario (panel o tarjeta), la automatización o el script que llamó a
+  `sk_irrigation.stop_all`, o la condición — y el aspersor que estaba regando y hasta dónde llegó la secuencia
+  ("5 de 21"). Si alguien cerró una válvula por fuera de la integración, se indica quién.
+- Historial: **filtro por programa** y botón **Historial** en cada tarjeta de programa. La pestaña carga todo el historial guardado.
+- Las fechas y horas usan la **zona horaria de Home Assistant** (la del terreno), no la del navegador; se agrega "Ayer".
+
 ## 1.5.3 — 2026-10-24
 - **Seguridad:** la verificación en vivo de condiciones solo evalúa plantillas Jinja para administradores; los demás usuarios
   solo ven el resultado de plantillas que ya están guardadas en la configuración (como hace Home Assistant al evaluar

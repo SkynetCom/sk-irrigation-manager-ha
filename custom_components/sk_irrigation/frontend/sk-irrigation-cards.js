@@ -195,12 +195,15 @@ class SkBaseCard extends HTMLElement {
   _isOn(id) { const s = this._hass?.states[id]; return !!s && ["on", "open", "opening"].includes(s.state); }
   _when(iso) {
     if (!iso) return "—";
-    const d = new Date(iso), now = new Date(store.now());
-    const tm = d.toLocaleTimeString(this._hass.language, { hour: "2-digit", minute: "2-digit" });
-    const diff = Math.round((new Date(d.toDateString()) - new Date(now.toDateString())) / 86400000);
+    // Home Assistant's time zone, like the panel
+    const d = new Date(iso);
+    const timeZone = this._hass.config?.time_zone || undefined;
+    const ymd = (ms) => { try { return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(ms)); } catch (e) { return new Date(ms).toDateString(); } };
+    const tm = d.toLocaleTimeString(this._hass.language, { hour: "2-digit", minute: "2-digit", timeZone });
+    const diff = Math.round((Date.parse(ymd(d.getTime())) - Date.parse(ymd(store.now()))) / 86400000);
     if (diff === 0) return `${this.t("today")} ${tm}`;
     if (diff === 1) return `${this.t("tomorrow")} ${tm}`;
-    return `${d.toLocaleDateString(this._hass.language, { weekday: "short", day: "numeric", month: "short" })} ${tm}`;
+    return `${d.toLocaleDateString(this._hass.language, { weekday: "short", day: "numeric", month: "short", timeZone })} ${tm}`;
   }
   _reason(r) {
     const i = r.indexOf(":");

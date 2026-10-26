@@ -9,8 +9,8 @@ import logging
 import math
 from typing import Any
 
-from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP, STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.core import Context, Event, HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_change
@@ -30,6 +30,7 @@ from .const import (
     START_FIXED,
     STATUS_COMPLETED,
     STATUS_ERROR,
+    STATUS_INTERRUPTED,
     STATUS_SKIPPED,
     STATUS_STOPPED,
     SUPPORTED_DOMAINS,
@@ -75,6 +76,7 @@ class ActiveZone:
     ends: datetime
     seconds: int
     skip: asyncio.Event = field(default_factory=asyncio.Event)
+    off_context: Context | None = None  # set when the valve was closed outside the integration
 
 
 @dataclass
@@ -96,6 +98,9 @@ class Run:
     status: str = "queued"
     recheck: list[dict] = field(default_factory=list)
     stop_reason: str | None = None
+    stopped_by: dict | None = None  # who stopped the run (user, automation, script…)
+    cut_at: dict | None = None  # where it was stopped: open sprinklers and progress
+    external_off: dict[str, Context] = field(default_factory=dict)  # zone start -> context of the external "off"
 
     @property
     def zone_count(self) -> int:
@@ -115,6 +120,7 @@ class IrrigationEngine:
         self._listeners: set[Callable[[dict], None]] = set()
         self._unsubs: list[Callable[[], None]] = []
         self._fired: set[str] = set()
+        self._stopping = False
         self.queue: list[Run] = []
         self.current: Run | None = None
         self._task: asyncio.Task | None = None
@@ -162,12 +168,37 @@ class IrrigationEngine:
     # ------------------------------------------------------------ lifecycle
     async def async_start(self) -> None:
         self._unsubs.append(async_track_time_change(self.hass, self._async_tick, second=0))
+        self._unsubs.append(self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, self._async_on_ha_stop))
         self._watch_condition_entities()
         # A run that was interrupted by a restart leaves valves open: close them.
         if self.store.interrupted:
             _LOGGER.warning("Previous run was interrupted, closing all zones")
             await self._all_off()
             self.store.set_interrupted(False)
+        # ...and log what it watered, so the history and the report stay complete
+        snap = self.store.running
+        if snap:
+            self.store.add_history({**snap, "status": STATUS_INTERRUPTED, "reason": "restart",
+                                    "end": snap.get("updated") or snap.get("start")})
+            self.store.set_running(None)
+
+    def _snapshot(self, run: Run, active_until: datetime | None = None) -> dict:
+        """Persistable summary of the run; optionally counts active zones up to ``active_until``."""
+        zones = list(run.done)
+        if active_until:
+            for a in run.active.values():
+                zones.append({"zone_id": a.zone_id, "start": a.started.isoformat(),
+                              "seconds": int(max(0, (active_until - a.started).total_seconds())), "planned": a.seconds})
+        return {"id": run.id, "name": run.name, "program_id": run.program_id, "source": run.source,
+                "start": run.started.isoformat() if run.started else None,
+                "updated": dt_util.now().isoformat(), "zones": zones}
+
+    async def _async_on_ha_stop(self, _event: Event) -> None:
+        """Home Assistant is stopping: save the run in progress before the loop goes away."""
+        self._stopping = True
+        if self.current:
+            self.store.set_running(self._snapshot(self.current, active_until=dt_util.now()))
+        await self.store.async_save_now()
 
     async def async_stop(self) -> None:
         for unsub in self._unsubs:
@@ -497,7 +528,24 @@ class IrrigationEngine:
             self.notify()
 
     # ------------------------------------------------------------ control
-    async def async_stop_all(self) -> None:
+    async def describe_context(self, context: Context | None) -> dict:
+        """Who is behind a context: the automation or script that ran, or the user, as in the logbook."""
+        if context is None:
+            return {"kind": "system"}
+        ids = {context.id, context.parent_id} - {None}
+        for st in self.hass.states.async_all(["automation", "script"]):
+            if st.context and (st.context.id in ids or (st.context.parent_id and st.context.parent_id in ids)):
+                return {"kind": st.domain, "name": st.attributes.get("friendly_name") or st.entity_id, "id": st.entity_id}
+        if context.user_id:
+            user = await self.hass.auth.async_get_user(context.user_id)
+            return {"kind": "user", "name": user.name if user else context.user_id, "id": context.user_id}
+        return {"kind": "system"}
+
+    async def async_stop_all(self, by: dict | None = None) -> None:
+        if self.current:
+            self._mark_cut(self.current)
+            if by:
+                self.current.stopped_by = by
         self.queue.clear()
         if self._task and not self._task.done():
             self._task.cancel()
@@ -530,6 +578,7 @@ class IrrigationEngine:
             run.planned_end = run.started + timedelta(seconds=total + self._master_overhead())
             run.pending = [z.zone_id for s in run.steps for z in s.zones]
             self.store.set_interrupted(True)
+            self.store.set_running(self._snapshot(run))
             self._notify_service(f"💧 {run.name}: inicio ({math.ceil(total / 60)} min)")
             self.notify()
             status, reason = STATUS_COMPLETED, ""
@@ -553,19 +602,48 @@ class IrrigationEngine:
         return self.settings["master_lead_s"] + self.settings["master_lag_s"]
 
     async def _finish(self, run: Run, status: str, reason: str) -> None:
-        for active in list(run.active.values()):
-            await self._turn(active.entity_id, False)
+        if self._stopping:
+            # shutting down: the snapshot saved on stop is logged as "interrupted" on the next start
+            self.current = None
+            return
+        # Count what the open zones watered and write the history first: a controller that
+        # does not answer when we close it must never cost the record of the run.
+        open_zones = list(run.active.values())
+        for active in open_zones:
             self._record_zone(run, active, dt_util.now())
         run.active.clear()
-        await self._master(False)
         end = dt_util.now()
-        self.store.add_history({
+        entry = {
             "id": run.id, "name": run.name, "program_id": run.program_id, "source": run.source,
             "status": status, "reason": reason, "start": run.started.isoformat() if run.started else None,
             "end": end.isoformat(), "zones": run.done,
-        })
-        self.store.set_interrupted(False)
+        }
+        if status != STATUS_COMPLETED:
+            # where the run was cut: the sprinklers that were open, and how far the sequence got
+            entry["at"] = run.cut_at or {"zone_ids": [a.zone_id for a in open_zones],
+                                         "done": len(run.done) - len(open_zones), "total": run.zone_count}
+            if run.stopped_by:
+                entry["by"] = run.stopped_by
+        try:
+            for zone in run.done:
+                ctx = run.external_off.get(zone.get("start", ""))
+                if ctx is not None:
+                    zone["off_by"] = await self.describe_context(ctx)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Could not resolve who closed a valve", exc_info=True)
+        self.store.add_history(entry)
+        self.store.set_running(None)
         self.current = None
+        for active in open_zones:
+            try:
+                await self._turn(active.entity_id, False)
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Could not turn off %s", active.entity_id)
+        try:
+            await self._master(False)
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Could not turn off the master valve")
+        self.store.set_interrupted(False)
         icon = "✅" if status == STATUS_COMPLETED else "⛔"
         self._notify_service(f"{icon} {run.name}: {status}")
         self.notify()
@@ -586,12 +664,20 @@ class IrrigationEngine:
         if run.stop_reason:
             raise ConditionStop(run.stop_reason)
 
+    def _mark_cut(self, run: Run) -> None:
+        """Remember where the run is right now (first call wins)."""
+        if run.cut_at is None:
+            open_ids = list(run.active)
+            done = len([d for d in run.done if d.get("zone_id") not in open_ids])
+            run.cut_at = {"zone_ids": open_ids, "done": done, "total": run.zone_count}
+
     def _check_recheck(self, run: Run) -> None:
         if not run.stop_reason:
             failures = self.condition_failures(run.recheck, recheck_only=True)
             if failures:
                 run.stop_reason = ", ".join(failures)
         if run.stop_reason:
+            self._mark_cut(run)
             raise ConditionStop(run.stop_reason)
 
     async def _watchdog(self, run: Run) -> None:
@@ -601,6 +687,7 @@ class IrrigationEngine:
             failures = self.condition_failures(run.recheck, recheck_only=True)
             if failures:
                 run.stop_reason = ", ".join(failures)
+                self._mark_cut(run)
                 for active in run.active.values():
                     active.skip.set()
                 return
@@ -663,6 +750,7 @@ class IrrigationEngine:
                 return
             if new.state not in (STATE_ON, "open", "opening", STATE_UNKNOWN, STATE_UNAVAILABLE):
                 _LOGGER.info("%s closed externally, moving on", entity_id)
+                run.external_off[active.started.isoformat()] = new.context
                 active.skip.set()
 
         unsub = async_track_state_change_event(self.hass, [entity_id], _state_changed)
@@ -689,6 +777,8 @@ class IrrigationEngine:
         run.done.append({"zone_id": active.zone_id, "start": active.started.isoformat(),
                          "seconds": watered, "planned": active.seconds})
         self.store.update_zone_stat(active.zone_id, end.isoformat(), watered)
+        if self.current is run:
+            self.store.set_running(self._snapshot(run))
 
     # ------------------------------------------------------------ hardware
     def _platform(self, entity_id: str) -> str | None:

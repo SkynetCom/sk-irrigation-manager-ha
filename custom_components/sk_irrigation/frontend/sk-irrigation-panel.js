@@ -300,15 +300,30 @@ class SkIrrigationPanel extends HTMLElement {
     this._toastTimer = setTimeout(() => { el.remove(); this._toastTimer = null; }, text.length > 40 ? 5000 : 2400);
   }
 
+  // Times are shown in Home Assistant's time zone: schedules belong to the property,
+  // not to wherever the browser happens to be.
+  _tz() { return this._hass.config?.time_zone || undefined; }
+
+  // "YYYY-MM-DD" of a timestamp in Home Assistant's time zone
+  _ymd(ms) {
+    try {
+      return new Intl.DateTimeFormat("en-CA", { timeZone: this._tz(), year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(ms));
+    } catch (err) {
+      const d = new Date(ms);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+  }
+
   _fmtWhen(iso) {
     if (!iso) return "—";
     const d = new Date(iso);
-    const now = new Date(this._now());
-    const tm = d.toLocaleTimeString(this._hass.language, { hour: "2-digit", minute: "2-digit" });
-    const dayDiff = Math.round((new Date(d.toDateString()) - new Date(now.toDateString())) / 86400000);
+    const tz = this._tz();
+    const tm = d.toLocaleTimeString(this._hass.language, { hour: "2-digit", minute: "2-digit", timeZone: tz });
+    const dayDiff = Math.round((Date.parse(this._ymd(d.getTime())) - Date.parse(this._ymd(this._now()))) / 86400000);
     if (dayDiff === 0) return `${this.t("today")} ${tm}`;
     if (dayDiff === 1) return `${this.t("tomorrow")} ${tm}`;
-    return `${d.toLocaleDateString(this._hass.language, { weekday: "short", day: "numeric", month: "short" })} ${tm}`;
+    if (dayDiff === -1) return `${this.t("yesterday")} ${tm}`;
+    return `${d.toLocaleDateString(this._hass.language, { weekday: "short", day: "numeric", month: "short", timeZone: tz })} ${tm}`;
   }
 
   _budget() { return this._state?.budget ?? 100; }
@@ -761,10 +776,12 @@ class SkIrrigationPanel extends HTMLElement {
           }).join("")}</div>
           ${can ? `<div class="row" style="margin-top:12px;gap:6px">
             <button class="btn sm water" data-action="run-program" data-id="${p.id}"><ha-icon icon="mdi:play"></ha-icon>${this.t("run_now")}</button>
+            <button class="btn sm" data-action="prog-history" data-id="${p.id}"><ha-icon icon="mdi:history"></ha-icon>${this.t("tab_history")}</button>
             <div class="spacer"></div>
             <button class="btn sm" data-action="edit-program" data-id="${p.id}"><ha-icon icon="mdi:pencil"></ha-icon>${this.t("edit")}</button>
             <button class="btn icon" title="${this.t("duplicate")}" data-action="dup-program" data-id="${p.id}"><ha-icon icon="mdi:content-copy"></ha-icon></button>
-            <button class="btn icon" title="${this.t("delete")}" data-action="delete-program" data-id="${p.id}"><ha-icon icon="mdi:delete-outline"></ha-icon></button></div>` : ""}
+            <button class="btn icon" title="${this.t("delete")}" data-action="delete-program" data-id="${p.id}"><ha-icon icon="mdi:delete-outline"></ha-icon></button></div>`
+          : `<div class="row" style="margin-top:12px"><button class="btn sm" data-action="prog-history" data-id="${p.id}"><ha-icon icon="mdi:history"></ha-icon>${this.t("tab_history")}</button></div>`}
         </div></div>`;
       }).join("")}
       </div>
@@ -1501,19 +1518,49 @@ class SkIrrigationPanel extends HTMLElement {
   }
 
   // ------------------------------------------------------------ history tab
+  // the full stored history (the pushed state only carries the latest runs)
+  async _loadHistory() {
+    const marker = this._state?.history?.[0]?.id || "";
+    if (this._histLoading || (this._histFull && this._histMarker === marker)) return;
+    this._histLoading = true;
+    try {
+      this._histFull = (await this._hass.callWS({ type: `${DOMAIN}/history` })).history;
+      this._histMarker = marker;
+      if (this._tab === "history") this._render();
+    } catch (err) { /* keep the pushed history */ } finally { this._histLoading = false; }
+  }
+
+  _byText(by) {
+    if (!by) return "";
+    if (by.kind === "user") return by.name;
+    if (by.kind === "automation") return `${this.t("by_automation")} «${by.name}»`;
+    if (by.kind === "script") return `${this.t("by_script")} «${by.name}»`;
+    return this.t("by_system");
+  }
+
   _render_history() {
-    const hist = this._state.history || [];
-    if (!hist.length) return `<div class="card"><div class="empty"><ha-icon icon="mdi:history"></ha-icon>${this.t("no_history")}</div></div>`;
-    const cls = { completed: "green", stopped: "amber", skipped: "", error: "red" };
-    return `<div class="card"><div class="bd" style="padding-top:12px"><div class="table-wrap"><table>
+    this._loadHistory();
+    const all = this._histFull || this._state.history || [];
+    const pid = this._histProg;
+    const hist = pid ? all.filter((h) => (pid === "_manual" ? !h.program_id : h.program_id === pid)) : all;
+    const chip = (id, label, color) => `<button class="chip ${(this._histProg || "") === id ? "on" : ""}" data-action="hist-filter" data-id="${esc(id)}">
+      ${color ? `<span class="swatch" style="background:${esc(color)}"></span>` : ""}${esc(label)}</button>`;
+    const filters = `<div class="chips hist-filter">${chip("", this.t("rep_all"))}${this._programs.map((p) => chip(p.id, p.name, p.color)).join("")}${chip("_manual", this.t("rep_manual"))}</div>`;
+    if (!hist.length) return `${filters}<div class="card"><div class="empty"><ha-icon icon="mdi:history"></ha-icon>${this.t("no_history")}</div></div>`;
+    const cls = { completed: "green", stopped: "amber", interrupted: "amber", skipped: "", error: "red" };
+    return `${filters}<div class="card"><div class="bd" style="padding-top:12px"><div class="table-wrap"><table>
       <thead><tr><th>${this.t("h_date")}</th><th>${this.t("h_program")}</th><th>${this.t("h_source")}</th><th>${this.t("h_status")}</th>
         <th>${this.t("h_duration")}</th><th>${this.t("h_water")}</th></tr></thead><tbody>
       ${hist.map((h) => {
         const secs = h.start && h.end ? (Date.parse(h.end) - Date.parse(h.start)) / 1000 : 0;
         const water = (h.zones || []).reduce((a, z) => a + ((this._zone(z.zone_id)?.flow_rate || 0) * z.seconds) / 60, 0);
         return `<tr><td class="tnum">${this._fmtWhen(h.start)}</td>
-          <td><b>${esc(h.name)}</b>${h.zones?.length ? `<div class="small muted">${h.zones.map((z) => `${esc(this._zone(z.zone_id)?.name || "?")} ${fmtDur(z.seconds)}`).join(" · ")}</div>` : ""}
-            ${h.reason && h.status !== "completed" ? `<div class="small muted">${esc(h.reason.split(", condition:").map((r) => this._reasonText(r)).join(", "))}</div>` : ""}</td>
+          <td><b>${esc(h.name)}</b>${h.zones?.length ? `<div class="small muted">${h.zones.map((z) => `${esc(this._zone(z.zone_id)?.name || "?")} ${fmtDur(z.seconds)}${z.off_by ? ` <span class="off-by">(${esc(this.t("closed"))} ${esc(this._byText(z.off_by))})</span>` : ""}`).join(" · ")}</div>` : ""}
+            ${h.reason && h.status !== "completed" && h.reason !== "stopped" ? `<div class="small muted">${esc(h.reason.split(", condition:").map((r) => this._reasonText(r)).join(", "))}</div>` : ""}
+            ${h.by || h.at ? `<div class="small hist-cut"><ha-icon icon="mdi:stop-circle-outline"></ha-icon>${esc([
+              h.by ? `${this.t("stopped_lc")} ${this._byText(h.by)}` : "",
+              h.at ? `${this.t("cut_at")} ${(h.at.zone_ids || []).map((zid) => this._zone(zid)?.name || "?").join(", ") || "—"} · ${Math.min(h.at.total, h.at.done + 1)} ${this.t("of")} ${h.at.total}` : "",
+            ].filter(Boolean).join(" · "))}</div>` : ""}</td>
           <td>${this.t(`src_${h.source}`)}</td><td><span class="badge ${cls[h.status] || ""}">${this.t(`stat_${h.status}`)}</span></td>
           <td class="tnum">${h.status === "skipped" ? "—" : fmtDur(secs)}</td><td class="tnum">${water ? `${Math.round(water)} L` : "—"}</td></tr>`;
       }).join("")}</tbody></table></div></div></div>`;
@@ -1596,6 +1643,12 @@ class SkIrrigationPanel extends HTMLElement {
         try { localStorage.setItem("ski-tab", id); } catch (err) { /* ignore */ }
         if (id === "groups") this._refreshCandidates();
         break;
+      case "prog-history":
+        this._histProg = id;
+        this._tab = "history";
+        try { localStorage.setItem("ski-tab", "history"); } catch (err) { /* ignore */ }
+        break;
+      case "hist-filter": this._histProg = id || null; break;
       case "stop": await this._action("stop"); this._toast(this.t("stopped")); break;
       case "skip": await this._action("skip", id ? { target: id } : {}); return;
       case "run-program": {

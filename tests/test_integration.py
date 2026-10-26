@@ -340,3 +340,89 @@ async def test_check_conditions_templates_admin_only(hass, hass_ws_client, hass_
     admin = await hass_ws_client(hass)
     await admin.send_json({"id": 1, "type": f"{DOMAIN}/check_conditions", "conditions": [new]})
     assert (await admin.receive_json())["result"][0]["ok"] is True
+
+
+async def test_run_cut_by_ha_stop_is_logged_as_interrupted(hass):
+    from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+    from custom_components.sk_irrigation.engine import IrrigationEngine
+    from custom_components.sk_irrigation.store import IrrigationStore
+
+    _, engine = await _setup(hass)
+    await _configure(engine, concurrency=1, minutes=5)
+    engine.enqueue_program(next(p for p in engine.config["programs"] if p["id"] == "p1"))
+    for _ in range(30):
+        await asyncio.sleep(0.1)
+        if engine.current and engine.current.active:
+            break
+    await asyncio.sleep(1.2)
+    hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
+    await hass.async_block_till_done()
+    snap = engine.store.running
+    assert snap and snap["program_id"] == "p1" and snap["zones"][0]["seconds"] >= 1
+    await engine.async_stop()
+    # next start: the run shows up in the history and in the daily report
+    store = IrrigationStore(hass)
+    await store.async_load()
+    restarted = IrrigationEngine(hass, store)
+    await restarted.async_start()
+    entry = store.history[0]
+    assert entry["status"] == "interrupted" and entry["reason"] == "restart" and entry["zones"]
+    day = next(iter(store.stats.values()))["p1"]
+    assert day["stop"] == 1 and day["z"]
+    assert store.running is None
+    await restarted.async_stop()
+
+
+async def test_history_written_even_if_closing_a_valve_fails(hass):
+    _, engine = await _setup(hass)
+    await _configure(engine, concurrency=1, minutes=0.03)
+    original = engine._turn
+
+    async def flaky(entity_id, on, seconds=None):
+        if not on and entity_id == ZONES[0]:
+            raise RuntimeError("controller did not answer")
+        await original(entity_id, on, seconds)
+
+    engine._turn = flaky
+    engine.enqueue_program(next(p for p in engine.config["programs"] if p["id"] == "p1"))
+    await _wait_idle(hass, engine)
+    assert engine.store.history[0]["program_id"] == "p1"
+    assert engine.store.running is None
+
+
+async def test_stop_records_who_and_where(hass, hass_ws_client):
+    from homeassistant.core import Context
+
+    _, engine = await _setup(hass)
+    await _configure(engine, concurrency=1, minutes=5)
+    program = next(p for p in engine.config["programs"] if p["id"] == "p1")
+
+    async def run_until_active():
+        engine.enqueue_program(program)
+        for _ in range(40):
+            await asyncio.sleep(0.1)
+            if engine.current and engine.current.active:
+                return
+
+    # stopped from the panel by a user
+    await run_until_active()
+    client = await hass_ws_client(hass)
+    await client.send_json({"id": 1, "type": f"{DOMAIN}/action", "action": "stop"})
+    assert (await client.receive_json())["success"]
+    await _wait_idle(hass, engine)
+    entry = engine.store.history[0]
+    assert entry["status"] == "stopped" and entry["by"]["kind"] == "user"
+    assert entry["at"] == {"zone_ids": ["z1"], "done": 0, "total": 4}
+
+    # stopped by an automation calling sk_irrigation.stop_all
+    await run_until_active()
+    ctx = Context()
+    hass.states.async_set("automation.night_guard", "on", {"friendly_name": "Night guard"}, context=ctx)
+    await hass.services.async_call(DOMAIN, "stop_all", {}, blocking=True, context=ctx)
+    await _wait_idle(hass, engine)
+    entry = engine.store.history[0]
+    assert entry["by"] == {"kind": "automation", "name": "Night guard", "id": "automation.night_guard"}
+
+    # the full history is available over the websocket
+    await client.send_json({"id": 2, "type": f"{DOMAIN}/history"})
+    assert len((await client.receive_json())["result"]["history"]) == 2

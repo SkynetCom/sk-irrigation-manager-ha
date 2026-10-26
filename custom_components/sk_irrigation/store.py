@@ -26,6 +26,8 @@ class IrrigationStore:
         self.history: list[dict] = []
         self.zone_stats: dict[str, dict] = {}
         self.interrupted = False
+        # snapshot of the run in progress, so a restart or crash can still log it
+        self.running: dict | None = None
 
     async def async_load(self) -> None:
         data = await self._store.async_load() or {}
@@ -33,6 +35,7 @@ class IrrigationStore:
         self.history = data.get("history", [])
         self.zone_stats = data.get("zone_stats", {})
         self.interrupted = bool(data.get("interrupted", False))
+        self.running = data.get("running") if isinstance(data.get("running"), dict) else None
         stats = await self._stats_store.async_load()
         if stats is None:
             # first start with this version: seed the report from the stored history
@@ -50,6 +53,7 @@ class IrrigationStore:
             "history": self.history,
             "zone_stats": self.zone_stats,
             "interrupted": self.interrupted,
+            "running": self.running,
         }
 
     def schedule_save(self) -> None:
@@ -90,6 +94,15 @@ class IrrigationStore:
         stat["last_seconds"] = seconds
         stat["total_seconds"] = stat.get("total_seconds", 0) + seconds
         self.schedule_save()
+
+    def set_running(self, snapshot: dict | None) -> None:
+        self.running = snapshot
+        self.schedule_save()
+
+    async def async_save_now(self) -> None:
+        """Write everything immediately (Home Assistant is shutting down)."""
+        await self._store.async_save(self._data())
+        await self._stats_store.async_save(self._stats_data())
 
     def set_interrupted(self, value: bool) -> None:
         self.interrupted = value

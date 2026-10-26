@@ -358,6 +358,10 @@ td { padding: 10px 8px; border-bottom: 1px solid var(--ski-line); vertical-align
 @keyframes glow { 0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ski-water) 45%, transparent); } 50% { box-shadow: 0 0 0 5px transparent; } }
 @keyframes fade { from { opacity: 0; } }
 @keyframes rise { from { opacity: 0; transform: translate(-50%, 10px); } }
+.hist-filter { margin-bottom: 12px; }
+.hist-cut { display: flex; align-items: center; gap: 6px; color: var(--ski-amber); font-weight: 500; margin-top: 3px; }
+.hist-cut ha-icon { --mdc-icon-size: 15px; }
+.off-by { color: var(--ski-amber); }
 /* ---------- map tab ---------- */
 .map-empty { padding: 48px 20px; }
 .map-empty h2 { margin: 4px 0 6px; color: var(--ski-text); font-size: 18px; }

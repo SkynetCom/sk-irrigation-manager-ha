@@ -241,6 +241,7 @@ const statsDays = (() => {
 })();
 const handlers = {
   "sk_irrigation/stats": () => ({ days: statsDays }),
+  "sk_irrigation/history": () => ({ history }),
   "auth/sign_path": (m) => ({ path: `${m.path}?authSig=demo` }),
   "sk_irrigation/check_conditions": (m) => m.conditions.map((c) => ({ id: c.id, ...evalCond(c) })),
   "sk_irrigation/data": () => ({ version: new URLSearchParams(location.search).get("installed") || PANEL_VERSION, config, state: state(), candidates, is_admin: true }),
@@ -260,7 +261,8 @@ const handlers = {
     if (m.action === "run_program") { const p = config.programs.find((x) => x.id === m.target); run = enqueue(p.name, "manual", planProgram(p), p.id); }
     if (m.action === "run_zone") { const z = config.zones.find((x) => x.id === m.target || x.entity_id === m.target); run = enqueue(z.name, "manual", [{ label: z.name, concurrency: 1, zones: [{ zone_id: z.id, seconds: m.minutes * 60 }] }]); }
     if (m.action === "run_group") { const g = config.groups.find((x) => x.id === m.target); run = enqueue(g.name, "manual", [{ label: g.name, concurrency: m.concurrency ?? 1, zones: g.zone_ids.map((z) => ({ zone_id: z, seconds: m.minutes * 60 })) }]); }
-    if (m.action === "stop") { if (current) history.unshift({ id: current.id, name: current.name, source: current.source, status: "stopped", reason: "stopped", start: current.started, end: iso(Date.now()), zones: current.done }); queue.length = 0; current = null; }
+    if (m.action === "stop") { if (current) history.unshift({ id: current.id, name: current.name, program_id: current.program_id, source: current.source, status: "stopped", reason: "stopped", start: current.started, end: iso(Date.now()), zones: current.done,
+      by: { kind: "user", name: "Marcos" }, at: { zone_ids: current.active.map((a) => a.zone_id), done: current.done.length, total: current.zones } }); queue.length = 0; current = null; }
     if (m.action === "skip" && current) { current._bars.forEach((b) => { if (b.rs <= Date.now() && b.re > Date.now() && (!m.target || b.zone_id === m.target)) b.re = Date.now(); }); }
     if (m.action === "rain_delay") config.settings.rain_delay_until = m.hours ? iso(Date.now() + m.hours * 3600000) : null;
     if (m.action === "remove_queued") { const i = queue.findIndex((r) => r.id === m.target); if (i >= 0) queue.splice(i, 1); }

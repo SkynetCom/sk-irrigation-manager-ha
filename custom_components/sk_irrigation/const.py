@@ -61,6 +61,7 @@ STATUS_COMPLETED = "completed"
 STATUS_STOPPED = "stopped"
 STATUS_SKIPPED = "skipped"
 STATUS_ERROR = "error"
+STATUS_INTERRUPTED = "interrupted"  # Home Assistant stopped or crashed during the run
 
 RAIN_WEATHER_CONDITIONS = ["rainy", "pouring", "lightning-rainy", "snowy", "snowy-rainy", "hail"]
 

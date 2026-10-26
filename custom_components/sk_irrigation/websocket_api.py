@@ -26,6 +26,7 @@ def async_register_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_save)
     websocket_api.async_register_command(hass, ws_import)
     websocket_api.async_register_command(hass, ws_stats)
+    websocket_api.async_register_command(hass, ws_history)
     websocket_api.async_register_command(hass, ws_action)
     websocket_api.async_register_command(hass, ws_check_conditions)
 
@@ -115,7 +116,7 @@ async def ws_action(hass: HomeAssistant, connection: websocket_api.ActiveConnect
     if not engine:
         return _not_loaded(connection, msg)
     try:
-        result = await _run_action(engine, msg)
+        result = await _run_action(engine, msg, connection.user)
     except ConditionBlocked as err:
         return connection.send_result(msg["id"], {"run": None, "blocked": err.reasons, "state": engine.state_dict()})
     except LookupError as err:
@@ -123,7 +124,7 @@ async def ws_action(hass: HomeAssistant, connection: websocket_api.ActiveConnect
     connection.send_result(msg["id"], {"run": result, "state": engine.state_dict()})
 
 
-async def _run_action(engine: IrrigationEngine, msg: dict) -> Any:
+async def _run_action(engine: IrrigationEngine, msg: dict, user: Any = None) -> Any:
     action = msg["action"]
     ref = msg.get("target")
     result: Any = None
@@ -147,7 +148,7 @@ async def _run_action(engine: IrrigationEngine, msg: dict) -> Any:
         run = engine.enqueue_zone(zone, msg.get("minutes", 5))
         result = run.summary() if run else None
     elif action == "stop":
-        await engine.async_stop_all()
+        await engine.async_stop_all({"kind": "user", "name": user.name, "id": user.id} if user else None)
     elif action == "skip":
         engine.skip(ref)
     elif action == "rain_delay":
@@ -197,3 +198,13 @@ def ws_stats(hass: HomeAssistant, connection: websocket_api.ActiveConnection, ms
     since = msg.get("since") or ""
     days = {k: v for k, v in engine.store.stats.items() if k >= since}
     connection.send_result(msg["id"], {"days": days})
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/history"})
+@callback
+def ws_history(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """The whole stored run history (the pushed state only carries the latest runs)."""
+    engine = _engine(hass)
+    if not engine:
+        return _not_loaded(connection, msg)
+    connection.send_result(msg["id"], {"history": engine.store.history})

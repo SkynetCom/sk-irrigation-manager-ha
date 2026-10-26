@@ -2,6 +2,17 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
+## Unreleased
+- **Fixed: a run cut short could disappear from the history and the report.** The run in progress is now saved after every
+  sprinkler; if Home Assistant stops, restarts or crashes in the middle, the run is logged on the next start as
+  **Interrupted** with what it watered. The history entry is also written before closing the valves, so a controller that
+  doesn't answer can no longer cost the record.
+- History: **who stopped a run and where** — the user (panel or card), the automation or script that called
+  `sk_irrigation.stop_all`, or the condition — plus the sprinkler that was running and how far the sequence got
+  ("5 of 21"). A valve closed outside the integration shows who closed it.
+- History: **filter by program**, and a **History** button on every program card. The tab now loads the whole stored history.
+- Dates and times follow **Home Assistant's time zone** (the property's), not the browser's; adds "Yesterday".
+
 ## 1.5.3 — 2026-10-24
 - **Security:** the live condition check only renders Jinja templates for administrators; other users get results only for
   templates already saved in the configuration (as Home Assistant does for template rendering). Suggested by @frenck.
