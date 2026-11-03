@@ -124,7 +124,7 @@ Upload a top-down **drone photo or a site plan** (or use **satellite** imagery),
 
 ## 🧩 Dashboard cards
 
-The integration ships 4 cards that **load automatically**: no resources to add. Edit a dashboard → **Add card** → search for **"SK Irrigation"**.
+The integration ships 5 cards that **load automatically**: no resources to add. Edit a dashboard → **Add card** → search for **"SK Irrigation"**.
 
 <p align="center"><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/cards.png" alt="Dashboard cards" width="100%"></p>
 
@@ -134,6 +134,7 @@ The integration ships 4 cards that **load automatically**: no resources to add. 
 | `custom:sk-irrigation-programs-card` | Cycles with start times, duration, next run, a warning if it would not run, enable and run now | `title`, `show_run`, `show_disabled` |
 | `custom:sk-irrigation-groups-card` | Groups with their live sprinklers and quick group watering | `title`, `group`, `columns`, `minutes`, `concurrency` |
 | `custom:sk-irrigation-zones-card` | Sprinkler grid with state, last run and manual watering | `title`, `group`, `columns`, `minutes` |
+| `custom:sk-irrigation-map-card` | **View only:** your maps from the Map tab with live watering: the sprinkler that is on, for how long and what is left, and what already ran. Follows the run across maps | `title`, `map`, `height`, `follow`, `show_status`, `show_legend` |
 
 `columns` sets the number of columns (for example `8` for a full-width card). Leave it empty to fit automatically.
 
@@ -144,6 +145,17 @@ group: Front yard   # name or id; empty = all
 minutes: [5, 10, 15]
 concurrency: 2
 columns: 3
+```
+
+The map card has no controls: tap an area to see its state and last run. Leave `map` empty to show every map with buttons to switch between them, or set it to one map's name or id. The scroll wheel doesn't zoom it, so the dashboard keeps scrolling; use the + / − buttons or pinch.
+
+```yaml
+type: custom:sk-irrigation-map-card
+title: Live watering
+map: Controller 2   # name or id; empty = all maps
+height: 420
+follow: true        # switch maps on its own when the run moves to another one
+show_legend: true
 ```
 
 ## 🚀 Installation

@@ -294,7 +294,14 @@ if (qs0.get("cards")) {
   const col = () => { const c = document.createElement("div"); c.style.cssText = "display:flex;flex-direction:column;gap:16px"; grid.appendChild(c); return c; };
   const c1 = col(), c2 = col(), c3 = col();
   const mk = (tag, cfg, parent) => { const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass; parent.appendChild(el); return el; };
-  window.cards = [mk("sk-irrigation-status-card", {}, c1), mk("sk-irrigation-programs-card", {}, c1),
+  if (qs0.get("cards") === "map") {
+    // map cards preview: ?cards=map[&run=1]
+    grid.style.gridTemplateColumns = "minmax(0,2fr) minmax(0,1fr)";
+    c3.remove();
+    window.cards = [mk("sk-irrigation-map-card", { title: L("Riego en vivo", "Live watering"), show_legend: true, height: 460 }, c1),
+      mk("sk-irrigation-map-card", { map: handlers["sk_irrigation/data"]().config.maps[0]?.id, height: 300 }, c2),
+      mk("sk-irrigation-status-card", { show_controls: false }, c2)];
+  } else window.cards = [mk("sk-irrigation-status-card", {}, c1), mk("sk-irrigation-programs-card", {}, c1),
     mk("sk-irrigation-groups-card", {}, c2), mk("sk-irrigation-zones-card", { minutes: 5 }, c3)];
   document.body.appendChild(grid);
   panel = { set hass(h) { window.cards.forEach((c) => { c.hass = h; }); }, _action: (a, x) => handlers["sk_irrigation/action"]({ action: a, ...x }), _render() {} };

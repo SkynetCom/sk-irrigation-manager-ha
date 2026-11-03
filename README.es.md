@@ -124,7 +124,7 @@ Subí una **foto de dron o un plano** de tu terreno (o usá la vista **satelital
 
 ## 🧩 Tarjetas para dashboards
 
-La integración trae 4 tarjetas que **se cargan solas**: no hace falta agregar recursos. Editá un dashboard → **Agregar tarjeta** → buscá **"SK Riego"**.
+La integración trae 5 tarjetas que **se cargan solas**: no hace falta agregar recursos. Editá un dashboard → **Agregar tarjeta** → buscá **"SK Riego"**.
 
 <p align="center"><img src="https://raw.githubusercontent.com/SkynetCom/sk-irrigation-manager-ha/main/docs/cards.es.png" alt="Tarjetas para dashboards" width="100%"></p>
 
@@ -134,6 +134,7 @@ La integración trae 4 tarjetas que **se cargan solas**: no hace falta agregar r
 | `custom:sk-irrigation-programs-card` | Ciclos con horarios, duración, próximo riego, aviso si no se ejecutaría, activar y regar ahora | `title`, `show_run`, `show_disabled` |
 | `custom:sk-irrigation-groups-card` | Grupos con sus aspersores encendidos en vivo y riego rápido del grupo | `title`, `group`, `columns`, `minutes`, `concurrency` |
 | `custom:sk-irrigation-zones-card` | Grilla de aspersores con estado, último riego y riego manual | `title`, `group`, `columns`, `minutes` |
+| `custom:sk-irrigation-map-card` | **Solo visualización:** tus mapas de la pestaña Mapa con el riego en vivo: qué aspersor está regando, desde hace cuánto, cuánto falta y cuáles ya regaron. Sigue el ciclo de un mapa a otro | `title`, `map`, `height`, `follow`, `show_status`, `show_legend` |
 
 `columns` fija la cantidad de columnas (por ejemplo `8` para una tarjeta a todo el ancho). Si se deja vacío, se ajusta solo.
 
@@ -144,6 +145,17 @@ group: Jardín frontal   # nombre o id; vacío = todos
 minutes: [5, 10, 15]
 concurrency: 2
 columns: 3
+```
+
+La tarjeta de mapa no tiene controles: tocá un área para ver su estado y su último riego. Con `map` vacío muestra todos los mapas con botones para cambiar entre ellos; si no, poné el nombre o el id de un mapa. La rueda del mouse no le hace zoom, así el dashboard sigue desplazándose: usá los botones + / − o pellizcá.
+
+```yaml
+type: custom:sk-irrigation-map-card
+title: Riego en vivo
+map: Controlador 2   # nombre o id; vacío = todos los mapas
+height: 420
+follow: true         # cambia de mapa solo cuando el ciclo pasa a otro
+show_legend: true
 ```
 
 ## 🚀 Instalación

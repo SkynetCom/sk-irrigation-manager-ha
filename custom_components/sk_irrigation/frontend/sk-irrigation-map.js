@@ -298,13 +298,13 @@ export const MapMixin = {
       this._mapDims = { w, h };
       const bounds = L.latLngBounds([0, 0], [h, w]);
       const map = L.map(el, { crs: L.CRS.Simple, minZoom: -4, maxZoom: 4, zoomSnap: 0.25, zoomDelta: 0.5,
-        attributionControl: false, maxBounds: bounds.pad(0.3) });
+        attributionControl: false, maxBounds: bounds.pad(0.3), ...(this._mapOptions || {}) });
       if (imageUrl) L.imageOverlay(imageUrl, bounds).addTo(map);
       map.fitBounds(bounds);
       this._lmap = map;
     } else {
       const center = view.center || [this._hass.config?.latitude ?? 0, this._hass.config?.longitude ?? 0];
-      const map = L.map(el, { maxZoom: 21 }).setView(center, view.zoom || 18);
+      const map = L.map(el, { maxZoom: 21, ...(this._mapOptions || {}) }).setView(center, view.zoom || 18);
       L.tileLayer(SATELLITE_URL, { maxNativeZoom: view.max_native_zoom || 18, maxZoom: 21, attribution: SATELLITE_ATTRIBUTION }).addTo(map);
       this._lmap = map;
     }

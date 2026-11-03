@@ -2,6 +2,12 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
+## 1.7.0 — 2026-11-03
+- New **map card** (`custom:sk-irrigation-map-card`, "SK Irrigation · Map"), view only: the maps from the Map tab with live
+  watering on any dashboard — the sprinkler that is on with how long it has run and what is left, the next one, and what
+  already ran. Shows one map or all of them with buttons to switch, follows the run across maps, and an optional status line
+  and legend. Tapping an area shows its state and last run. The map code only loads on dashboards that use the card.
+
 ## 1.6.0 — 2026-10-26
 - **Fixed: a run cut short could disappear from the history and the report.** The run in progress is now saved after every
   sprinkler; if Home Assistant stops, restarts or crashes in the middle, the run is logged on the next start as

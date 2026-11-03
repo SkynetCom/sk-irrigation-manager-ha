@@ -2,7 +2,7 @@
 // Loaded globally by the integration (no manual resource needed). All cards on
 // a dashboard share one websocket subscription through a tiny store.
 const DOMAIN = "sk_irrigation";
-const CARD_VERSION = "1.6.0";
+const CARD_VERSION = "1.7.0";
 
 const T = {
   es: {
@@ -15,6 +15,8 @@ const T = {
     today: "Hoy", tomorrow: "Mañana", loading: "Cargando…", not_loaded: "SK Irrigation Manager no está cargado.",
     sprinklers: "aspersores", last: "Último", never: "Nunca", open_panel: "Abrir panel", min_each: "min c/u",
     rain_sensor: "Sensor de lluvia", weather: "Clima", freeze: "Helada", condition: "Condición",
+    map: "Mapa", no_maps: "Todavía no hay mapas. Crealos en la pestaña Mapa del panel.", map_not_found: "No se encontró el mapa",
+    follow: "Seguir riego", manual: "Riego manual", map_error: "No se pudo cargar el mapa",
   },
   en: {
     title: "Irrigation", programs: "Irrigation cycles", groups: "Groups", zones: "Sprinklers",
@@ -26,6 +28,8 @@ const T = {
     today: "Today", tomorrow: "Tomorrow", loading: "Loading…", not_loaded: "SK Irrigation Manager is not loaded.",
     sprinklers: "sprinklers", last: "Last", never: "Never", open_panel: "Open panel", min_each: "min each",
     rain_sensor: "Rain sensor", weather: "Weather", freeze: "Frost", condition: "Condition",
+    map: "Map", no_maps: "No maps yet. Create them in the Map tab of the panel.", map_not_found: "Map not found",
+    follow: "Follow watering", manual: "Manual watering", map_error: "The map could not be loaded",
   },
 };
 
@@ -46,10 +50,14 @@ const fmtDur = (sec) => {
 const LABELS = {
   es: { title: "Título", show_controls: "Mostrar controles (sistema y retraso por lluvia)", show_run: "Botón regar ahora",
     show_disabled: "Mostrar ciclos desactivados", group: "Grupo (nombre o id, vacío = todos)", concurrency: "Aspersores a la vez (0 = todos)",
-    minutes: "Minutos del riego manual", columns: "Columnas (vacío = automático)" },
+    minutes: "Minutos del riego manual", columns: "Columnas (vacío = automático)",
+    map: "Mapa (vacío = todos, con botones para cambiar)", height: "Alto del mapa (px)", follow: "Seguir riego (cambia de mapa solo)",
+    show_status: "Mostrar estado del riego debajo", show_legend: "Mostrar referencias de colores" },
   en: { title: "Title", show_controls: "Show controls (system and rain delay)", show_run: "Run now button",
     show_disabled: "Show disabled cycles", group: "Group (name or id, empty = all)", concurrency: "Sprinklers at once (0 = all)",
-    minutes: "Manual run minutes", columns: "Columns (empty = auto)" },
+    minutes: "Manual run minutes", columns: "Columns (empty = auto)",
+    map: "Map (empty = all, with buttons to switch)", height: "Map height (px)", follow: "Follow watering (switches maps on its own)",
+    show_status: "Show watering status below", show_legend: "Show color legend" },
 };
 const computeLabel = (s) => {
   const lang = (document.querySelector("home-assistant")?.hass?.language || navigator.language || "en").startsWith("es") ? "es" : "en";
@@ -220,7 +228,7 @@ class SkBaseCard extends HTMLElement {
     if (store.error && !store.config) body = `<div class="empty">${this.t("not_loaded")}</div>`;
     else if (!store.config || !store.state) body = `<div class="empty">${this.t("loading")}</div>`;
     else body = this.body();
-    this.shadowRoot.innerHTML = `<style>${CSS}</style><ha-card>${body}${this._msg ? `<div class="toast">${esc(this._msg)}</div>` : ""}</ha-card>`;
+    this.shadowRoot.innerHTML = `<style>${CSS}${this.extraCss?.() || ""}</style><ha-card class="${this.cardClass || ""}">${body}${this._msg ? `<div class="toast">${esc(this._msg)}</div>` : ""}</ha-card>`;
     this._tick();
   }
   _liveStates() {
@@ -228,10 +236,11 @@ class SkBaseCard extends HTMLElement {
   }
   _tick() {
     const now = store.now();
-    this.shadowRoot.querySelectorAll("[data-end]").forEach((el) => {
+    this.shadowRoot.querySelectorAll("[data-end], [data-mode=elapsed]").forEach((el) => {
       const end = Date.parse(el.dataset.end), start = Date.parse(el.dataset.start);
       const pct = Math.min(100, Math.max(0, ((now - start) / Math.max(1, end - start)) * 100));
-      if (el.dataset.mode === "clock") el.textContent = fmtClock((end - now) / 1000);
+      if (el.dataset.mode === "elapsed") el.textContent = Number.isNaN(start) ? "" : fmtClock((now - start) / 1000);
+      else if (el.dataset.mode === "clock") el.textContent = fmtClock((end - now) / 1000);
       else if (el.dataset.mode === "bar") el.style.width = `${pct}%`;
       else el.style.setProperty("--p", pct.toFixed(1));
     });
@@ -441,6 +450,113 @@ class SkZonesCard extends SkBaseCard {
   }
 }
 
+// ------------------------------------------------------------------ map card
+// View only: the maps from the panel's Map tab with live watering. The map
+// code (and Leaflet) loads the first time one of these cards is shown.
+class SkMapCard extends SkBaseCard {
+  static getStubConfig() { return { follow: true, show_status: true }; }
+  static getConfigForm() {
+    const maps = store.config?.maps || [];
+    return { computeLabel, schema: [
+      { name: "title", selector: { text: {} } },
+      { name: "map", selector: maps.length
+        ? { select: { mode: "dropdown", custom_value: true, options: maps.map((m) => ({ value: m.id, label: m.name || m.id })) } }
+        : { text: {} } },
+      { name: "height", selector: { number: { min: 160, max: 1200, step: 10, mode: "box", unit_of_measurement: "px" } } },
+      { name: "follow", selector: { boolean: {} } },
+      { name: "show_status", selector: { boolean: {} } },
+      { name: "show_legend", selector: { boolean: {} } },
+    ] };
+  }
+  getCardSize() { return Math.ceil((this._height() + 110) / 50); }
+  getGridOptions() { return { columns: 12, min_columns: 6 }; }
+  get cardClass() { return "map"; }
+  extraCss() { return this._mod?.MAP_CARD_CSS || ""; }
+  _height() { return Math.min(1200, Math.max(160, Number(this._config?.height) || 360)); }
+  setConfig(config) {
+    super.setConfig(config);
+    if (this._view) this._view._mapFollow = this._config.follow !== false;
+  }
+  _load() {
+    if (this._mod || this._loading) return;
+    this._loading = import(new URL(`./sk-irrigation-map-card.js?v=${CARD_VERSION}`, import.meta.url).href)
+      .then((mod) => {
+        this._mod = mod;
+        this._view = new mod.SkMapView(this, store);
+        this._view._mapFollow = this._config.follow !== false;
+      })
+      .catch((err) => { this._loadErr = err; })
+      .finally(() => this._render());
+  }
+  _render() {
+    if (!this._hass || !this._config) return;
+    this._load();
+    super._render();
+    if (this._view && store.config && store.state && this._view.maps().length) this._view._mapAttach();
+  }
+  _liveStates() { this._view?._mapRefresh(); }
+  body() {
+    const v = this._view;
+    const title = this._config.title;
+    if (this._loadErr) return `<div class="empty">${this.t("map_error")}: ${esc(this._loadErr.message || this._loadErr)}</div>`;
+    if (!v) return `<div class="empty">${this.t("loading")}</div>`;
+    const maps = v.maps();
+    if (!maps.length) {
+      const msg = (store.config.maps || []).length ? `${this.t("map_not_found")}: ${esc(this._config.map)}` : this.t("no_maps");
+      return `${this.header("mdi:map-outline", title || this.t("map"))}<div class="empty" style="padding:16px">${msg}</div>`;
+    }
+    const view = v._mapView();
+    const states = v._mapZoneStates();
+    const chips = maps.length > 1 ? `<div class="mchips">${maps.map((m) => {
+      const live = Object.keys(m.shapes || {}).some((z) => states[z]?.st === "on");
+      return `<button class="mchip ${m.id === view.id ? "on" : ""}" data-a="mview" data-id="${esc(m.id)}">${live ? `<span class="live-dot"></span>` : ""}${esc(m.name)}</button>`;
+    }).join("")}<button class="mchip follow ${v._mapFollow === false ? "" : "on"}" data-a="mfollow" title="${this.t("follow")}"><ha-icon icon="mdi:crosshairs-gps"></ha-icon></button></div>` : "";
+    const head = title || maps.length > 1 ? `<div class="hd">${title ? `<ha-icon icon="mdi:map-outline"></ha-icon><span class="t">${esc(title)}</span>` : ""}${chips}</div>` : "";
+    return `${head}<div id="ski-map-slot" class="map-slot" style="--ski-map-h:${this._height()}px"></div>
+      ${this._config.show_status === false ? "" : this._strip(states)}
+      ${this._config.show_legend ? `<div class="map-legend">
+        <span><i class="lg on"></i>${v.t("map_lg_on")}</span><span><i class="lg next"></i>${v.t("map_lg_next")}</span>
+        <span><i class="lg done"></i>${v.t("map_lg_done")}</span><span><i class="lg idle"></i>${v.t("map_lg_idle")}</span>
+        <span><i class="lg off"></i>${v.t("map_lg_off")}</span></div>` : ""}`;
+  }
+  _strip(states) {
+    const st = store.state, cur = st.current;
+    if (cur) {
+      const names = cur.active.map((a) => store.zone(a.zone_id)?.name || a.entity_id).join(", ");
+      const a = cur.active[0];
+      return `<div class="mstrip on"><ha-icon icon="mdi:sprinkler-variant"></ha-icon><div class="grow">
+          <div class="ln"><b>${esc(names || cur.name)}</b> <span class="muted">· ${esc(cur.name)}</span></div>
+          <div class="bar"><i data-start="${cur.started}" data-end="${cur.planned_end}" data-mode="bar"></i></div></div>
+        ${a ? `<span class="tnum" data-start="${a.started}" data-end="${a.ends}" data-mode="clock"></span>` : ""}</div>`;
+    }
+    const manual = (store.config.zones || []).filter((z) => states[z.id]?.st === "on");
+    if (manual.length) {
+      return `<div class="mstrip on"><ha-icon icon="mdi:sprinkler-variant"></ha-icon><div class="grow ln">
+        <b>${esc(manual.map((z) => z.name).join(", "))}</b> <span class="muted">· ${this.t("manual")}</span></div>
+        <span class="tnum" data-start="${esc(states[manual[0].id].started || "")}" data-mode="elapsed"></span></div>`;
+    }
+    const nxt = st.next;
+    return `<div class="mstrip"><ha-icon icon="mdi:timer-sand"></ha-icon><div class="grow ln">
+      <span class="pill ${st.status}">${this.t(`st_${st.status}`)}</span>
+      <span class="muted"> ${nxt ? `${this.t("next")}: <b>${esc(nxt.name)}</b> · ${this._when(nxt.at)}` : this.t("none")}</span></div></div>`;
+  }
+  _click(e) {
+    const el = e.target.closest("[data-a]");
+    const v = this._view;
+    if (!el || !v) return;
+    const active = () => Object.entries(v._mapZoneStates()).filter(([, s]) => s.st === "on").map(([z]) => z).join();
+    if (el.dataset.a === "mview") {
+      v._mapId = el.dataset.id;
+      v._mapFollowPausedFor = active();
+    } else if (el.dataset.a === "mfollow") {
+      v._mapFollow = v._mapFollow === false;
+      v._mapFollowPausedFor = undefined;
+      v._mapFollowKey = null;
+    } else return;
+    this._render();
+  }
+}
+
 // The card picker is built before the cards get `hass`, so follow the page language.
 const PICKER_ES = (document.documentElement.lang || navigator.language || "").startsWith("es");
 const CARDS = PICKER_ES ? [
@@ -448,11 +564,13 @@ const CARDS = PICKER_ES ? [
   ["sk-irrigation-programs-card", SkProgramsCard, "SK Riego · Ciclos", "Programas/ciclos con próximo riego, duración, activar y regar ahora."],
   ["sk-irrigation-groups-card", SkGroupsCard, "SK Riego · Grupos", "Grupos con sus aspersores en vivo y riego rápido del grupo."],
   ["sk-irrigation-zones-card", SkZonesCard, "SK Riego · Aspersores", "Grilla de aspersores con estado en vivo y riego manual."],
+  ["sk-irrigation-map-card", SkMapCard, "SK Riego · Mapa", "Tus mapas con el riego en vivo: qué aspersor riega, desde hace cuánto y cuánto falta. Solo visualización."],
 ] : [
   ["sk-irrigation-status-card", SkStatusCard, "SK Irrigation · Status", "Current run, next run, conditions and quick controls."],
   ["sk-irrigation-programs-card", SkProgramsCard, "SK Irrigation · Programs", "Programs/cycles with next run, duration, enable and run now."],
   ["sk-irrigation-groups-card", SkGroupsCard, "SK Irrigation · Groups", "Groups with their live sprinklers and quick group watering."],
   ["sk-irrigation-zones-card", SkZonesCard, "SK Irrigation · Sprinklers", "Sprinkler grid with live state and manual watering."],
+  ["sk-irrigation-map-card", SkMapCard, "SK Irrigation · Map", "Your maps with live watering: which sprinkler is on, for how long and what is left. View only."],
 ];
 window.customCards = window.customCards || [];
 for (const [tag, cls, name, description] of CARDS) {

@@ -2,6 +2,13 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
+## 1.7.0 — 2026-11-03
+- Nueva **tarjeta de mapa** (`custom:sk-irrigation-map-card`, "SK Riego · Mapa"), solo de visualización: los mapas de la
+  pestaña Mapa con el riego en vivo en cualquier dashboard — el aspersor que riega con cuánto lleva y cuánto falta, el
+  próximo y los que ya regaron. Muestra un mapa o todos con botones para cambiar, sigue el ciclo de un mapa a otro, y
+  tiene una línea de estado y referencias opcionales. Al tocar un área se ve su estado y su último riego. El código del
+  mapa solo se carga en los dashboards que usan la tarjeta.
+
 ## 1.6.0 — 2026-10-26
 - **Corregido: un ciclo cortado podía desaparecer del historial y del reporte.** El ciclo en curso ahora se guarda después
   de cada aspersor; si Home Assistant se detiene, se reinicia o se cae a mitad de riego, en el próximo arranque queda
