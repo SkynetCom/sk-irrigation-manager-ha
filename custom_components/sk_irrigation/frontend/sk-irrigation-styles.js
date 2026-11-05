@@ -119,6 +119,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .toolbar .pill { background: rgba(255,255,255,.18); padding: 4px 12px; border-radius: 99px; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
 .toolbar .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .toolbar .pill.running .dot { animation: pulse 1.4s infinite; background: #9cf7c7; }
+/* phones: the title needs the room; the state is already on the page */
+@media (max-width: 520px) { .toolbar .pill { display: none; } .toolbar .title { font-size: 18px; } }
 .tabs { flex: none; z-index: 4; display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none;
   background: var(--app-header-background-color, var(--ski-primary)); color: var(--app-header-text-color, #fff); padding: 0 8px; }
 .tabs::-webkit-scrollbar { display: none; }
@@ -129,9 +131,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .tab:hover { opacity: 1; }
 main { max-width: 1600px; margin: 0 auto; padding: 20px 16px 120px; font-size: 14px; }
 .grid { display: grid; gap: 16px; }
-.cols-2 { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+.cols-2 { grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); }
 .cols-main { grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); }
-@media (max-width: 900px) { .cols-main { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .cols-main { grid-template-columns: minmax(0, 1fr); } }
 .card { background: var(--ski-card); border-radius: var(--ski-radius); box-shadow: var(--ski-shadow); border: 1px solid var(--ski-line); overflow: hidden; }
 .card > .hd { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
 .card > .hd h2, .card > .hd h3 { margin: 0; font-size: 16px; font-weight: 600; flex: 1; display: flex; align-items: center; gap: 8px; }
@@ -194,6 +196,7 @@ label.field > span { padding-left: 2px; }
 .badge.amber { background: color-mix(in srgb, var(--ski-amber) 18%, transparent); color: #b07800; }
 .badge.red { background: color-mix(in srgb, var(--ski-red) 14%, transparent); color: var(--ski-red); }
 .badge.rb { background: #00693c; color: #fff; }
+.bd > div > .badge, .bd > .badge { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
 .empty { text-align: center; color: var(--ski-muted); padding: 28px 12px; font-size: 14px; }
 .empty ha-icon { --mdc-icon-size: 40px; opacity: .5; display: block; margin: 0 auto 8px; }
 .banner.update { background: color-mix(in srgb, var(--ski-primary) 12%, var(--ski-card)); border: 1px solid color-mix(in srgb, var(--ski-primary) 40%, transparent); color: var(--ski-text); }
@@ -226,7 +229,8 @@ label.field > span { padding-left: 2px; }
 .zpill.active { background: var(--ski-water); color: #fff; border-color: var(--ski-water); animation: glow 1.6s infinite; }
 
 /* zone tiles */
-.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr)); gap: 12px; }
+@media (max-width: 600px) { .tiles { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; } }
 .tile { border: 1px solid var(--ski-line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; position: relative; background: var(--ski-card); border-left: 4px solid var(--c, var(--ski-green)); }
 .tile .nm { font-weight: 600; font-size: 14px; display: flex; gap: 6px; align-items: center; }
 .tile .nm ha-icon { --mdc-icon-size: 20px; color: var(--c); }
@@ -430,7 +434,8 @@ label.field > span { padding-left: 2px; }
 /* conditions */
 .cond-card { border: 1px solid var(--ski-line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: rgba(127,127,127,.03); }
 .cond-card .cond-label { flex: 1; min-width: 160px; font-weight: 600; }
-.cond-res { gap: 6px; min-width: 110px; }
+.cond-res { gap: 6px; min-width: 110px; max-width: 100%; }
+.cond-res > * { min-width: 0; overflow-wrap: anywhere; }
 textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; resize: vertical; }
 
 /* history table */
@@ -452,6 +457,9 @@ td { padding: 10px 8px; border-bottom: 1px solid var(--ski-line); vertical-align
 .hist-filter { margin-bottom: 12px; }
 .hist-cut { display: flex; align-items: center; gap: 6px; color: var(--ski-amber); font-weight: 500; margin-top: 3px; }
 .hist-cut ha-icon { --mdc-icon-size: 15px; }
+.hist-by { display: flex; align-items: center; gap: 4px; margin-top: 2px; white-space: nowrap; }
+.hist-by ha-icon { --mdc-icon-size: 14px; }
+.q-src { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
 .off-by { color: var(--ski-amber); }
 ${MAP_STYLES}
 /* ---------- dashboard report ---------- */

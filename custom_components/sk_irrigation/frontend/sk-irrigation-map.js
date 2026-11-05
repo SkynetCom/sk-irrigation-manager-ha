@@ -474,6 +474,7 @@ export const MapMixin = {
       <div class="small muted">${this.t("last_watered")}: ${stat?.last ? this._fmtWhen(stat.last) : this.t("never")}</div>
       ${can ? (st === "on" && this._state?.current
         ? `<div class="row"><button class="btn sm" data-mpop="skip"><ha-icon icon="mdi:skip-next"></ha-icon>${this.t("skip")}</button></div>`
+        : this._zoneBusy?.(z) ? `<div class="small"><b>${this.t(this._zoneBusy(z) === "on" ? "running_now" : "in_queue")}</b></div>`
         : `<div class="row">${[5, 10, 15].map((m, i) => `<button class="btn sm ${i ? "" : "water"}" data-mpop="run" data-min="${m}"><ha-icon icon="mdi:play"></ha-icon>${m} min</button>`).join("")}</div>`) : ""}
     </div>`;
     const pop = this._L.popup({ className: "ski-popup", maxWidth: 340, minWidth: 270 }).setLatLng(e.latlng).setContent(html).openOn(this._lmap);
@@ -483,7 +484,8 @@ export const MapMixin = {
       if (b.dataset.mpop === "skip") await this._action("skip", { target: zid });
       else {
         const res = await this._action("run_zone", { target: zid, minutes: Number(b.dataset.min) });
-        if (res?.blocked?.length) this._toast(res.blocked.map((r) => this._reasonText(r)).join(" · "));
+        if (res?.busy) this._toast(this.t("already_busy"));
+        else if (res?.blocked?.length) this._toast(res.blocked.map((r) => this._reasonText(r)).join(" · "));
         else this._toast(this.t("started"));
       }
     }));

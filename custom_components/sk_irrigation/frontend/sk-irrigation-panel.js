@@ -1,14 +1,14 @@
 // SK Irrigation Manager — Home Assistant panel.
 // Dependency-free web component: renders with template strings, uses event
 // delegation, and implements pointer-based drag & drop (mouse + touch).
-import { I18N } from "./sk-irrigation-i18n.js?v=1.7.0";
-import { STYLES } from "./sk-irrigation-styles.js?v=1.7.0";
-import { MapMixin } from "./sk-irrigation-map.js?v=1.7.0";
-import { ReportMixin } from "./sk-irrigation-report.js?v=1.7.0";
+import { I18N } from "./sk-irrigation-i18n.js?v=1.7.1";
+import { STYLES } from "./sk-irrigation-styles.js?v=1.7.1";
+import { MapMixin } from "./sk-irrigation-map.js?v=1.7.1";
+import { ReportMixin } from "./sk-irrigation-report.js?v=1.7.1";
 
 const DOMAIN = "sk_irrigation";
 // Version of this file; compared with the installed integration to spot a stale browser cache.
-export const PANEL_VERSION = "1.7.0";
+export const PANEL_VERSION = "1.7.1";
 const TABS = [
   ["dashboard", "mdi:view-dashboard-outline"],
   ["groups", "mdi:vector-arrange-below"],
@@ -382,6 +382,28 @@ class SkIrrigationPanel extends HTMLElement {
     return !!st && ["on", "open", "opening"].includes(st.state);
   }
 
+  // what is watering or waiting ("zone:z1", "group:g1", "program:p1"): its button stays disabled
+  _busy() {
+    const st = this._state || {};
+    const out = new Set([st.current?.target, ...(st.queue || []).map((q) => q.target)].filter(Boolean));
+    (st.current?.active || []).forEach((a) => out.add(`zone:${a.zone_id}`));
+    return out;
+  }
+
+  _zoneBusy(z) {
+    if (this._isOn(z.entity_id)) return "on";
+    const b = this._busy();
+    if ((this._state?.current?.active || []).some((a) => a.zone_id === z.id)) return "on";
+    return b.has(`zone:${z.id}`) ? "queued" : "";
+  }
+
+  // "Manual · Marcos": the source and, for manual runs, who asked for it
+  _srcText(r) {
+    const src = this.t(`src_${r.source}`);
+    const by = r.started_by || (r.source !== "schedule" ? r.by : null);
+    return by ? `${src} · ${this._byText(by)}` : src;
+  }
+
   // ------------------------------------------------------------ render
   _render() {
     const sr = this.shadowRoot;
@@ -458,6 +480,13 @@ class SkIrrigationPanel extends HTMLElement {
       const on = this._isOn(el.dataset.entity);
       el.classList.toggle("on", on);
     });
+    // a valve opened or closed outside a run: refresh its "Regar" button
+    this.shadowRoot.querySelectorAll("[data-run-zone]").forEach((el) => {
+      const z = this._zone(el.dataset.runZone);
+      if (!z) return;
+      const b = this._zoneBusy(z);
+      if ((el.dataset.busy || "") !== b) this._render();
+    });
   }
 
   // ------------------------------------------------------------ dashboard
@@ -504,7 +533,7 @@ class SkIrrigationPanel extends HTMLElement {
           <div><div class="big" data-start="${cur.started}" data-end="${cur.planned_end}" data-mode="clock">--:--</div>
           <div class="small muted">${this.t("remaining")}</div></div></div>
         <div class="info">
-          <div class="muted small">${this.t("now_watering")} · ${this.t(`src_${cur.source}`)}</div>
+          <div class="muted small">${this.t("now_watering")} · ${esc(this._srcText(cur))}</div>
           <h1>${esc(cur.name)}</h1>
           <div class="muted small">${this.t("step")} ${cur.step_index + 1} ${this.t("of")} ${cur.steps.length} · ${cur.zones} ${this.t("zones_lc")}</div>
         </div>
@@ -546,8 +575,12 @@ class SkIrrigationPanel extends HTMLElement {
           <div class="nm"><ha-icon icon="${esc(z.icon)}"></ha-icon><span style="flex:1">${esc(z.name)}</span>
             <span class="state-dot ${this._isOn(z.entity_id) ? "on" : ""}"></span></div>
           <div class="small muted">${this.t("last_watered")}: ${s?.last ? `${this._fmtWhen(s.last)} · ${fmtDur(s.last_seconds)}` : this.t("never")}</div>
-          ${this._can() ? `<div class="row"><button class="btn sm" data-action="open-run" data-kind="zone" data-id="${z.id}" ${z.enabled && z.entity_id ? "" : "disabled"}>
-            <ha-icon icon="mdi:play"></ha-icon>${this.t("run")}</button></div>` : ""}
+          ${this._can() ? (() => {
+            const busy = this._zoneBusy(z);
+            const label = busy === "on" ? this.t("running_now") : busy === "queued" ? this.t("in_queue") : this.t("run");
+            return `<div class="row"><button class="btn sm" data-action="open-run" data-kind="zone" data-id="${z.id}" data-run-zone="${z.id}" data-busy="${busy}" ${z.enabled && z.entity_id && !busy ? "" : "disabled"}>
+            <ha-icon icon="${busy === "on" ? "mdi:water" : busy === "queued" ? "mdi:tray-full" : "mdi:play"}"></ha-icon>${label}</button></div>`;
+          })() : ""}
         </div>`;
       }).join("")}
       </div></div></div>`;
@@ -586,7 +619,7 @@ class SkIrrigationPanel extends HTMLElement {
           <div style="flex:1;min-width:0"><b>${esc(p.name)}</b>
             <div class="small muted">${p.enabled ? (next ? this._fmtWhen(next) : "—") : this.t("program_disabled")} · ${fmtDur(sim.total)}</div></div>
           ${this._can() ? `<label class="switch"><input type="checkbox" data-bind="progenabled:${p.id}" ${p.enabled ? "checked" : ""}><span class="tr"></span></label>
-          <button class="btn icon" title="${this.t("run_now")}" data-action="run-program" data-id="${p.id}"><ha-icon icon="mdi:play-circle-outline"></ha-icon></button>` : ""}
+          <button class="btn icon" title="${this.t("run_now")}" data-action="run-program" data-id="${p.id}" ${this._busy().has(`program:${p.id}`) ? "disabled" : ""}><ha-icon icon="mdi:play-circle-outline"></ha-icon></button>` : ""}
         </div>`;
       }).join("") : `<div class="empty">${this.t("no_programs")}</div>`}
     </div></div>`;
@@ -595,7 +628,7 @@ class SkIrrigationPanel extends HTMLElement {
   _queueHtml() {
     return `<div class="card"><div class="hd"><h2><ha-icon icon="mdi:tray-full"></ha-icon>${this.t("queue")}</h2></div><div class="bd">
       ${this._state.queue.map((q, i) => `<div class="list-row"><span class="badge">${i + 1}</span><span style="flex:1">${esc(q.name)}</span>
-        <span class="small muted">${this.t(`src_${q.source}`)}</span>
+        <span class="small muted q-src">${esc(this._srcText(q))}</span>
         ${this._can() ? `<button class="btn icon" data-action="remove-queued" data-id="${q.id}"><ha-icon icon="mdi:close"></ha-icon></button>` : ""}</div>`).join("")}
     </div></div>`;
   }
@@ -712,7 +745,7 @@ class SkIrrigationPanel extends HTMLElement {
       <div class="hd">
         <input type="color" value="${esc(g.color)}" data-bind="group:${g.id}:color" ${can ? "" : "disabled"}>
         <input type="text" value="${esc(g.name)}" data-bind="group:${g.id}:name" ${can ? "" : "disabled"}>
-        ${can ? `<button class="btn icon" title="${this.t("quick_run_group")}" data-action="open-run" data-kind="group" data-id="${g.id}" ${g.zone_ids.length ? "" : "disabled"}><ha-icon icon="mdi:play-circle-outline"></ha-icon></button>
+        ${can ? `<button class="btn icon" title="${this.t("quick_run_group")}" data-action="open-run" data-kind="group" data-id="${g.id}" ${g.zone_ids.length && !this._busy().has(`group:${g.id}`) ? "" : "disabled"}><ha-icon icon="mdi:play-circle-outline"></ha-icon></button>
         <button class="btn icon" title="${this.t("delete")}" data-action="delete-group" data-id="${g.id}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>` : ""}
       </div>
       <div class="bd">
@@ -774,8 +807,8 @@ class SkIrrigationPanel extends HTMLElement {
             return g ? `<span class="zpill"><span class="swatch" style="background:${esc(g.color)}"></span>${i + 1}. ${esc(g.name)}
               · ${s.concurrency === 0 ? this.t("all") : s.concurrency === 1 ? this.t("sequential") : `×${s.concurrency}`}</span>` : "";
           }).join("")}</div>
-          ${can ? `<div class="row" style="margin-top:12px;gap:6px">
-            <button class="btn sm water" data-action="run-program" data-id="${p.id}"><ha-icon icon="mdi:play"></ha-icon>${this.t("run_now")}</button>
+          ${can ? `<div class="row wrap" style="margin-top:12px;gap:6px">
+            <button class="btn sm water" data-action="run-program" data-id="${p.id}" ${this._busy().has(`program:${p.id}`) ? "disabled" : ""}><ha-icon icon="mdi:play"></ha-icon>${this.t("run_now")}</button>
             <button class="btn sm" data-action="prog-history" data-id="${p.id}"><ha-icon icon="mdi:history"></ha-icon>${this.t("tab_history")}</button>
             <div class="spacer"></div>
             <button class="btn sm" data-action="edit-program" data-id="${p.id}"><ha-icon icon="mdi:pencil"></ha-icon>${this.t("edit")}</button>
@@ -1561,7 +1594,7 @@ class SkIrrigationPanel extends HTMLElement {
               h.by ? `${this.t("stopped_lc")} ${this._byText(h.by)}` : "",
               h.at ? `${this.t("cut_at")} ${(h.at.zone_ids || []).map((zid) => this._zone(zid)?.name || "?").join(", ") || "—"} · ${Math.min(h.at.total, h.at.done + 1)} ${this.t("of")} ${h.at.total}` : "",
             ].filter(Boolean).join(" · "))}</div>` : ""}</td>
-          <td>${this.t(`src_${h.source}`)}</td><td><span class="badge ${cls[h.status] || ""}">${this.t(`stat_${h.status}`)}</span></td>
+          <td>${this.t(`src_${h.source}`)}${h.started_by ? `<div class="small muted hist-by"><ha-icon icon="mdi:account-outline"></ha-icon>${esc(this._byText(h.started_by))}</div>` : ""}</td><td><span class="badge ${cls[h.status] || ""}">${this.t(`stat_${h.status}`)}</span></td>
           <td class="tnum">${h.status === "skipped" ? "—" : fmtDur(secs)}</td><td class="tnum">${water ? `${Math.round(water)} L` : "—"}</td></tr>`;
       }).join("")}</tbody></table></div></div></div>`;
   }
@@ -1653,6 +1686,7 @@ class SkIrrigationPanel extends HTMLElement {
       case "skip": await this._action("skip", id ? { target: id } : {}); return;
       case "run-program": {
         const res = await this._action("run_program", { target: id });
+        if (res?.busy) { this._toast(this.t("already_busy")); break; }
         if (res?.blocked) { this._toast(`${this.t("blocked")}: ${res.blocked.map((r) => this._reasonText(r)).join(", ")}`); break; }
         this._toast(res?.run ? (this._state.current?.id === res.run.id ? this.t("started") : this.t("queued")) : this.t("nothing_to_water"));
         break;
@@ -1669,6 +1703,7 @@ class SkIrrigationPanel extends HTMLElement {
         if (d.type === "confirm") { await d.onOk(); break; }
         const res = await this._action(d.kind === "zone" ? "run_zone" : "run_group",
           { target: d.id, minutes: Number(d.minutes) || 5, concurrency: d.concurrency });
+        if (res?.busy) { this._toast(this.t("already_busy")); break; }
         if (res?.blocked) { this._toast(`${this.t("blocked")}: ${res.blocked.map((r) => this._reasonText(r)).join(", ")}`); break; }
         this._toast(res?.run ? this.t("queued") : this.t("nothing_to_water"));
         break;
@@ -1697,7 +1732,7 @@ class SkIrrigationPanel extends HTMLElement {
         const z = this._zoneByEntity(d.entity_id);
         if (!z) { this._ensureZone(d.entity_id); await this._saveNow("layout"); }
         const res = await this._action("run_zone", { target: d.entity_id, minutes: 1 });
-        this._toast(res?.blocked ? `${this.t("blocked")}: ${res.blocked.map((r) => this._reasonText(r)).join(", ")}` : this.t("queued"));
+        this._toast(res?.busy ? this.t("already_busy") : res?.blocked ? `${this.t("blocked")}: ${res.blocked.map((r) => this._reasonText(r)).join(", ")}` : this.t("queued"));
         return;
       }
       case "zone-delete": {

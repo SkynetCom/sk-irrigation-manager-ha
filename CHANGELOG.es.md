@@ -2,6 +2,15 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
+## 1.7.1 — 2026-11-05
+- **Corregido: volver a tocar "Regar" en un aspersor que ya está regando sumaba más riegos a la cola.** Un aspersor, grupo
+  o programa que está regando o en cola ahora tiene el botón deshabilitado ("Regando" / "En cola"), en el panel, el mapa
+  y las tarjetas del dashboard; el servidor también rechaza la repetición desde un servicio o una pestaña vieja.
+- **Quién lanzó cada riego manual:** el usuario (panel o tarjeta) o la automatización o script que llamó al servicio. Se
+  ve junto a "Manual" en el riego actual, la cola y el historial, y el detalle del reporte suma "Riego manual por usuario".
+- **Celulares:** el panel ya no se sale por la derecha; los aspersores van en dos columnas, los textos largos de
+  condiciones y los botones bajan de línea, y el encabezado deja lugar al título.
+
 ## 1.7.0 — 2026-11-03
 - Nueva **tarjeta de mapa** (`custom:sk-irrigation-map-card`, "SK Riego · Mapa"), solo de visualización: los mapas de la
   pestaña Mapa con el riego en vivo en cualquier dashboard — el aspersor que riega con cuánto lleva y cuánto falta, el

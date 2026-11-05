@@ -2,6 +2,15 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
+## 1.7.1 — 2026-11-05
+- **Fixed: tapping "Water" again on a sprinkler that is already on stacked more runs in the queue.** A sprinkler, group or
+  program that is watering or queued now has its button disabled ("Watering" / "Queued"), in the panel, the map and the
+  dashboard cards; the server also refuses a repeat from a service call or an old browser tab.
+- **Who started each manual run:** the user (panel or card) or the automation or script that called the service. It shows
+  next to "Manual" in the current run, the queue and the history, and the report's detail adds "Manual watering by user".
+- **Phones:** the panel no longer runs off the right edge; sprinklers show in two columns, long condition texts and
+  buttons wrap, and the header keeps room for the title.
+
 ## 1.7.0 — 2026-11-03
 - New **map card** (`custom:sk-irrigation-map-card`, "SK Irrigation · Map"), view only: the maps from the Map tab with live
   watering on any dashboard — the sprinkler that is on with how long it has run and what is left, the next one, and what

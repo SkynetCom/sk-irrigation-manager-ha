@@ -130,7 +130,7 @@ export const ReportMixin = {
     const win = WINDOW[g] * (this.clientWidth && this.clientWidth < 700 ? 0.5 : 1);
     const end = all.length - st.off * Math.round(win);
     const starts = all.slice(Math.max(0, end - Math.round(win)), Math.max(0, end));
-    const buckets = starts.map((s) => ({ start: s, end: new Date(nextBucket(s, g).getTime() - 864e5), sec: 0, liters: 0, byProg: {}, zones: {}, ok: 0, stop: 0, rain: 0, cond: 0, daysWithData: 0 }));
+    const buckets = starts.map((s) => ({ start: s, end: new Date(nextBucket(s, g).getTime() - 864e5), sec: 0, liters: 0, byProg: {}, byUser: {}, zones: {}, ok: 0, stop: 0, rain: 0, cond: 0, daysWithData: 0 }));
     const index = new Map(buckets.map((b) => [isoDay(b.start), b]));
     const covers = new Set(this._programs.filter((p) => (p.steps || []).some((stp) => {
       const skip = new Set(stp.skip || []);
@@ -152,6 +152,10 @@ export const ReportMixin = {
         }
         b.sec += watered;
         b.byProg[pid] = (b.byProg[pid] || 0) + watered;
+        // who asked for manual runs (only exact with no sprinkler filter)
+        if (!st.flt.startsWith("g:") && !st.flt.startsWith("z:")) {
+          for (const [who, sec] of Object.entries(p.u || {})) b.byUser[who] = (b.byUser[who] || 0) + sec;
+        }
         // cycles count for the filter when the program waters the filtered sprinklers
         if (watered || st.flt === "all" || st.flt.startsWith("p:") || covers.has(pid)) {
           b.ok += p.ok || 0; b.stop += p.stop || 0; b.rain += p.rain || 0; b.cond += p.cond || 0;
@@ -441,6 +445,12 @@ export const ReportMixin = {
         ${b.rain + b.cond ? `<div class="sk">🌧 ${b.rain} ${this.t("rep_by_rain")} · ⚡ ${b.cond} ${this.t("rep_by_cond")}</div>` : ""}
         <h4 class="sub">${this.t("rep_by_program")}</h4>
         ${progs.filter((p) => b.byProg[p.id]).map((p) => `<div class="row"><span class="k"><i class="dot" style="background:${esc(p.color)}"></i>${esc(p.name)}</span><b class="v">${fmtHM(b.byProg[p.id])}</b></div>`).join("") || `<div class="muted2">—</div>`}
+        ${Object.keys(b.byUser).length ? `<h4 class="sub">${this.t("rep_by_user")}</h4>
+          ${Object.entries(b.byUser).sort((x, y) => y[1] - x[1]).map(([who, sec]) => {
+            const i = who.indexOf(":");
+            const by = { kind: who.slice(0, i), name: who.slice(i + 1) };
+            return `<div class="row"><span class="k"><ha-icon icon="${by.kind === "user" ? "mdi:account" : "mdi:robot-outline"}" style="--mdc-icon-size:14px"></ha-icon>${esc(this._byText(by))}</span><b class="v">${fmtHM(sec)}</b></div>`;
+          }).join("")}` : ""}
       </div>
       <div class="r"><h4>${this.t("rep_by_zone")}</h4>
         <div class="cols" style="grid-template-columns:repeat(${Math.min(cols.length, 4)},minmax(170px,1fr))">

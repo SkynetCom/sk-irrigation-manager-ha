@@ -193,5 +193,8 @@ def test_daily_stats_accumulate():
     assert day1["z"] == {"z1": 360, "z2": 120} and day1["ok"] == 1 and day1["stop"] == 1
     assert stats["2026-10-18"]["p1"]["rain"] == 1 and stats["2026-10-18"]["p1"]["cond"] == 1
     assert stats["2026-10-18"][m.STATS_MANUAL]["z"] == {"z3": 600}
+    m.add_run_to_stats(stats, {"program_id": None, "status": "completed", "start": "2026-10-18T11:00:00-06:00",
+                               "started_by": {"kind": "user", "name": "Ana"}, "zones": [{"zone_id": "z3", "seconds": 60}]})
+    assert stats["2026-10-18"][m.STATS_MANUAL]["u"] == {"user:Ana": 60}
     m.prune_stats(stats, date(2036, 10, 18), keep_days=3653)
     assert "2026-10-17" not in stats and "2026-10-18" in stats

@@ -426,3 +426,34 @@ async def test_stop_records_who_and_where(hass, hass_ws_client):
     # the full history is available over the websocket
     await client.send_json({"id": 2, "type": f"{DOMAIN}/history"})
     assert len((await client.receive_json())["result"]["history"]) == 2
+
+
+async def test_manual_run_records_who_and_blocks_repeats(hass, hass_ws_client):
+    _, engine = await _setup(hass)
+    await _configure(engine, concurrency=1, minutes=5)
+    client = await hass_ws_client(hass)
+
+    await client.send_json({"id": 1, "type": f"{DOMAIN}/action", "action": "run_zone", "target": "z1", "minutes": 5})
+    res = (await client.receive_json())["result"]
+    assert res["run"]["by"]["kind"] == "user" and res["run"]["target"] == "zone:z1"
+    for _ in range(40):
+        await asyncio.sleep(0.1)
+        if engine.current and engine.current.active:
+            break
+    # a second tap on the same sprinkler does not stack another run
+    await client.send_json({"id": 2, "type": f"{DOMAIN}/action", "action": "run_zone", "target": "z1", "minutes": 5})
+    res = (await client.receive_json())["result"]
+    assert res["busy"] and res["run"] is None and not engine.queue
+    # another sprinkler still queues, but only once
+    for i in (3, 4):
+        await client.send_json({"id": i, "type": f"{DOMAIN}/action", "action": "run_zone", "target": "z2", "minutes": 5})
+        await client.receive_json()
+    assert [r.target for r in engine.queue] == ["zone:z2"]
+
+    await client.send_json({"id": 5, "type": f"{DOMAIN}/action", "action": "stop"})
+    await client.receive_json()
+    await _wait_idle(hass, engine)
+    entry = engine.store.history[0]
+    assert entry["started_by"]["kind"] == "user" and entry["by"]["kind"] == "user"
+    day = next(iter(engine.store.stats.values()))
+    assert any(k.startswith("user:") for k in day[model.STATS_MANUAL]["u"])

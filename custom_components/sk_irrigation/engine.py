@@ -64,6 +64,10 @@ class ConditionBlocked(Exception):
         self.reasons = reasons
 
 
+class AlreadyBusy(Exception):
+    """Raised when the same sprinkler, group or program is already watering or queued."""
+
+
 class ConditionStop(Exception):
     """Raised inside a run when a re-checked condition stops being true."""
 
@@ -99,6 +103,8 @@ class Run:
     recheck: list[dict] = field(default_factory=list)
     stop_reason: str | None = None
     stopped_by: dict | None = None  # who stopped the run (user, automation, script…)
+    started_by: dict | None = None  # who asked for a manual or service run
+    target: str | None = None  # "zone:<id>", "group:<id>" or "program:<id>"
     cut_at: dict | None = None  # where it was stopped: open sprinklers and progress
     external_off: dict[str, Context] = field(default_factory=dict)  # zone start -> context of the external "off"
 
@@ -108,7 +114,8 @@ class Run:
 
     def summary(self) -> dict:
         return {"id": self.id, "name": self.name, "source": self.source, "program_id": self.program_id,
-                "zones": self.zone_count, "created": self.created.isoformat()}
+                "zones": self.zone_count, "created": self.created.isoformat(), "target": self.target,
+                "by": self.started_by}
 
 
 class IrrigationEngine:
@@ -189,9 +196,12 @@ class IrrigationEngine:
             for a in run.active.values():
                 zones.append({"zone_id": a.zone_id, "start": a.started.isoformat(),
                               "seconds": int(max(0, (active_until - a.started).total_seconds())), "planned": a.seconds})
-        return {"id": run.id, "name": run.name, "program_id": run.program_id, "source": run.source,
+        snap = {"id": run.id, "name": run.name, "program_id": run.program_id, "source": run.source,
                 "start": run.started.isoformat() if run.started else None,
                 "updated": dt_util.now().isoformat(), "zones": zones}
+        if run.started_by:
+            snap["started_by"] = run.started_by
+        return snap
 
     async def _async_on_ha_stop(self, _event: Event) -> None:
         """Home Assistant is stopping: save the run in progress before the loop goes away."""
@@ -440,27 +450,45 @@ class IrrigationEngine:
             + program.get("conditions", [])
         self.enqueue_program(program, SOURCE_SCHEDULE, recheck=recheck)
 
-    def _record_skip(self, name: str, program_id: str | None, source: str, reasons: list[str]) -> None:
-        self.store.add_history({
+    def _record_skip(self, name: str, program_id: str | None, source: str, reasons: list[str],
+                     by: dict | None = None) -> None:
+        entry = {
             "id": new_id("run"), "name": name, "program_id": program_id,
             "source": source, "status": STATUS_SKIPPED, "reason": ", ".join(reasons),
             "start": dt_util.now().isoformat(), "end": dt_util.now().isoformat(), "zones": [],
-        })
+        }
+        if by:
+            entry["started_by"] = by
+        self.store.add_history(entry)
         self._notify_service(f"⏭ {name}: omitido ({', '.join(reasons)})")
         self.notify()
 
-    def _manual_check(self, name: str, source: str, program: dict | None = None) -> list[dict]:
+    def _manual_check(self, name: str, source: str, program: dict | None = None,
+                      by: dict | None = None) -> list[dict]:
         """Apply custom conditions to manual/service runs; returns the re-check list."""
         if not self.settings.get("manual_conditions", True):
             return []
         conditions = self.settings.get("conditions", []) + (program.get("conditions", []) if program else [])
         reasons = self.condition_failures(conditions)
         if reasons:
-            self._record_skip(name, program["id"] if program else None, source, reasons)
+            self._record_skip(name, program["id"] if program else None, source, reasons, by)
             raise ConditionBlocked(reasons)
         return conditions
 
     # ------------------------------------------------------------ enqueue
+    def busy_targets(self) -> set[str]:
+        """What is watering or waiting: run targets plus every open sprinkler."""
+        runs = ([self.current] if self.current else []) + self.queue
+        out = {r.target for r in runs if r.target}
+        if self.current:
+            out |= {f"zone:{a.zone_id}" for a in self.current.active.values()}
+        return out
+
+    def _check_busy(self, target: str, entity_id: str | None = None) -> None:
+        """A second tap on the same button must not stack another run behind the first."""
+        if target in self.busy_targets() or (entity_id and self.hass.states.is_state(entity_id, "on")):
+            raise AlreadyBusy(target)
+
     def _delays(self, program: dict | None) -> tuple[int, int]:
         zd = self.settings["zone_delay_s"]
         sd = self.settings["step_delay_s"]
@@ -472,9 +500,11 @@ class IrrigationEngine:
         return zd, sd
 
     def enqueue_program(self, program: dict, source: str = SOURCE_MANUAL,
-                        recheck: list[dict] | None = None) -> Run | None:
+                        recheck: list[dict] | None = None, by: dict | None = None) -> Run | None:
+        target = f"program:{program['id']}"
         if source != SOURCE_SCHEDULE:
-            recheck = self._manual_check(program["name"], source, program)
+            self._check_busy(target)
+            recheck = self._manual_check(program["name"], source, program, by)
         steps = build_program_plan(program, self.zones_by_id(), self.groups_by_id(),
                                    self.budget_percent(), self.settings["max_zone_minutes"])
         if not steps:
@@ -482,31 +512,38 @@ class IrrigationEngine:
             return None
         zd, sd = self._delays(program)
         run = Run(id=new_id("run"), name=program["name"], source=source, steps=steps,
-                  program_id=program["id"], zone_delay=zd, step_delay=sd, recheck=recheck or [])
+                  program_id=program["id"], zone_delay=zd, step_delay=sd, recheck=recheck or [],
+                  target=target, started_by=by if source != SOURCE_SCHEDULE else None)
         return self._enqueue(run)
 
     def enqueue_group(self, group: dict, minutes: float, concurrency: int = 1,
-                      source: str = SOURCE_MANUAL) -> Run | None:
+                      source: str = SOURCE_MANUAL, by: dict | None = None) -> Run | None:
         zones = self.zones_by_id()
         seconds = int(min(minutes, self.settings["max_zone_minutes"]) * 60)
         planned = [PlannedZone(z, seconds) for z in group["zone_ids"]
                    if z in zones and zones[z]["enabled"] and zones[z]["entity_id"]]
         if not planned or seconds <= 0:
             return None
-        recheck = self._manual_check(group["name"], source)
+        target = f"group:{group['id']}"
+        self._check_busy(target)
+        recheck = self._manual_check(group["name"], source, by=by)
         zd, sd = self._delays(None)
         run = Run(id=new_id("run"), name=group["name"], source=source,
                   steps=[PlannedStep(group["name"], concurrency, planned)], zone_delay=zd, step_delay=sd,
-                  recheck=recheck)
+                  recheck=recheck, target=target, started_by=by)
         return self._enqueue(run)
 
-    def enqueue_zone(self, zone: dict, minutes: float, source: str = SOURCE_MANUAL) -> Run | None:
+    def enqueue_zone(self, zone: dict, minutes: float, source: str = SOURCE_MANUAL,
+                     by: dict | None = None) -> Run | None:
         seconds = int(min(minutes, self.settings["max_zone_minutes"]) * 60)
         if seconds <= 0 or not zone.get("entity_id"):
             return None
-        recheck = self._manual_check(zone["name"], source)
+        target = f"zone:{zone['id']}"
+        self._check_busy(target, zone["entity_id"])
+        recheck = self._manual_check(zone["name"], source, by=by)
         run = Run(id=new_id("run"), name=zone["name"], source=source,
-                  steps=[PlannedStep(zone["name"], 1, [PlannedZone(zone["id"], seconds)])], recheck=recheck)
+                  steps=[PlannedStep(zone["name"], 1, [PlannedZone(zone["id"], seconds)])], recheck=recheck,
+                  target=target, started_by=by)
         return self._enqueue(run)
 
     def _enqueue(self, run: Run) -> Run:
@@ -618,6 +655,8 @@ class IrrigationEngine:
             "status": status, "reason": reason, "start": run.started.isoformat() if run.started else None,
             "end": end.isoformat(), "zones": run.done,
         }
+        if run.started_by:
+            entry["started_by"] = run.started_by
         if status != STATUS_COMPLETED:
             # where the run was cut: the sprinklers that were open, and how far the sequence got
             entry["at"] = run.cut_at or {"zone_ids": [a.zone_id for a in open_zones],

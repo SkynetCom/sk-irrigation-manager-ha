@@ -512,7 +512,7 @@ def add_run_to_stats(stats: dict, entry: dict) -> None:
     """Fold one history entry into the per-day, per-program, per-sprinkler totals.
 
     ``stats`` maps "YYYY-MM-DD" (local date of the run start) to
-    ``{program_key: {"z": {zone_id: seconds}, "ok": n, "stop": n, "rain": n, "cond": n}}``.
+    ``{program_key: {"z": {zone_id: seconds}, "ok": n, "stop": n, "rain": n, "cond": n, "u": {who: seconds}}}``.
     """
     start = entry.get("start") or entry.get("end")
     if not isinstance(start, str) or len(start) < 10:
@@ -524,10 +524,18 @@ def add_run_to_stats(stats: dict, entry: dict) -> None:
         prog[skip_category(entry.get("reason", ""))] += 1
         return
     prog["ok" if status == "completed" else "stop"] += 1
+    watered = 0
     for z in entry.get("zones") or []:
         zid, sec = z.get("zone_id"), z.get("seconds")
         if zid and isinstance(sec, (int, float)) and sec > 0:
             prog["z"][zid] = prog["z"].get(zid, 0) + int(round(sec))
+            watered += int(round(sec))
+    # who asked for manual and service runs: seconds per "kind:name"
+    by = entry.get("started_by")
+    if isinstance(by, dict) and by.get("kind") and watered:
+        key = f"{by['kind']}:{by.get('name') or ''}"
+        users = prog.setdefault("u", {})
+        users[key] = users.get(key, 0) + watered
 
 
 def prune_stats(stats: dict, today: date, keep_days: int = STATS_KEEP_DAYS) -> None:

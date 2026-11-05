@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .const import COND_TEMPLATE, DOMAIN, SIGNAL_PROGRAMS_CHANGED, VERSION
-from .engine import ConditionBlocked, IrrigationEngine
+from .engine import AlreadyBusy, ConditionBlocked, IrrigationEngine
 from .maps import async_cleanup_images
 from .model import normalize_conditions
 
@@ -119,6 +119,8 @@ async def ws_action(hass: HomeAssistant, connection: websocket_api.ActiveConnect
         result = await _run_action(engine, msg, connection.user)
     except ConditionBlocked as err:
         return connection.send_result(msg["id"], {"run": None, "blocked": err.reasons, "state": engine.state_dict()})
+    except AlreadyBusy:
+        return connection.send_result(msg["id"], {"run": None, "busy": True, "state": engine.state_dict()})
     except LookupError as err:
         return connection.send_error(msg["id"], "not_found", str(err))
     connection.send_result(msg["id"], {"run": result, "state": engine.state_dict()})
@@ -128,27 +130,28 @@ async def _run_action(engine: IrrigationEngine, msg: dict, user: Any = None) -> 
     action = msg["action"]
     ref = msg.get("target")
     result: Any = None
+    by = {"kind": "user", "name": user.name, "id": user.id} if user else None
 
     if action == "run_program":
         program = engine.find_program(ref or "")
         if not program:
             raise LookupError("Program not found")
-        run = engine.enqueue_program(program)
+        run = engine.enqueue_program(program, by=by)
         result = run.summary() if run else None
     elif action == "run_group":
         group = engine.find_group(ref or "")
         if not group:
             raise LookupError("Group not found")
-        run = engine.enqueue_group(group, msg.get("minutes", 10), msg.get("concurrency", 1))
+        run = engine.enqueue_group(group, msg.get("minutes", 10), msg.get("concurrency", 1), by=by)
         result = run.summary() if run else None
     elif action == "run_zone":
         zone = engine.find_zone(ref or "")
         if not zone:
             raise LookupError("Zone not found")
-        run = engine.enqueue_zone(zone, msg.get("minutes", 5))
+        run = engine.enqueue_zone(zone, msg.get("minutes", 5), by=by)
         result = run.summary() if run else None
     elif action == "stop":
-        await engine.async_stop_all({"kind": "user", "name": user.name, "id": user.id} if user else None)
+        await engine.async_stop_all(by)
     elif action == "skip":
         engine.skip(ref)
     elif action == "rain_delay":

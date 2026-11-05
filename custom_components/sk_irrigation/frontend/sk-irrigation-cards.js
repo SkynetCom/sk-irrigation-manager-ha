@@ -2,7 +2,7 @@
 // Loaded globally by the integration (no manual resource needed). All cards on
 // a dashboard share one websocket subscription through a tiny store.
 const DOMAIN = "sk_irrigation";
-const CARD_VERSION = "1.7.0";
+const CARD_VERSION = "1.7.1";
 
 const T = {
   es: {
@@ -11,7 +11,7 @@ const T = {
     st_disabled: "Sistema desactivado", remaining: "restante", next: "Próximo riego", none: "Sin riegos programados",
     step: "Paso", of: "de", skip: "Saltar", stop: "Detener", run: "Regar", run_now: "Regar ahora", system: "Sistema",
     rain_delay: "Retraso 24 h", clear_delay: "Quitar retraso", all_clear: "Condiciones OK", disabled: "Desactivado",
-    running: "Regando", blocked: "No se ejecutaría", minutes: "min", queued: "En cola", not_run: "No se ejecutó",
+    running: "Regando", blocked: "No se ejecutaría", minutes: "min", queued: "En cola", not_run: "No se ejecutó", busy: "Ya está regando o en cola",
     today: "Hoy", tomorrow: "Mañana", loading: "Cargando…", not_loaded: "SK Irrigation Manager no está cargado.",
     sprinklers: "aspersores", last: "Último", never: "Nunca", open_panel: "Abrir panel", min_each: "min c/u",
     rain_sensor: "Sensor de lluvia", weather: "Clima", freeze: "Helada", condition: "Condición",
@@ -24,7 +24,7 @@ const T = {
     st_disabled: "System disabled", remaining: "remaining", next: "Next run", none: "No scheduled runs",
     step: "Step", of: "of", skip: "Skip", stop: "Stop", run: "Water", run_now: "Run now", system: "System",
     rain_delay: "Delay 24 h", clear_delay: "Clear delay", all_clear: "Conditions OK", disabled: "Disabled",
-    running: "Watering", blocked: "Would not run", minutes: "min", queued: "Queued", not_run: "Not run",
+    running: "Watering", blocked: "Would not run", minutes: "min", queued: "Queued", not_run: "Not run", busy: "Already watering or queued",
     today: "Today", tomorrow: "Tomorrow", loading: "Loading…", not_loaded: "SK Irrigation Manager is not loaded.",
     sprinklers: "sprinklers", last: "Last", never: "Never", open_panel: "Open panel", min_each: "min each",
     rain_sensor: "Rain sensor", weather: "Weather", freeze: "Frost", condition: "Condition",
@@ -135,6 +135,7 @@ const CSS = `
   button.b { border: 1px solid var(--divider-color, rgba(0,0,0,.12)); background: transparent; color: var(--primary-text-color); border-radius: 9px;
     padding: 5px 11px; font: inherit; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
   button.b:hover { background: rgba(127,127,127,.08); }
+  button.b[disabled], button.i[disabled] { opacity: .45; pointer-events: none; }
   button.b ha-icon { --mdc-icon-size: 17px; }
   button.b.primary { background: var(--primary-color); border-color: var(--primary-color); color: var(--text-primary-color, #fff); }
   button.b.danger { background: var(--error-color, #db4437); border-color: var(--error-color, #db4437); color: #fff; }
@@ -201,6 +202,17 @@ class SkBaseCard extends HTMLElement {
   disconnectedCallback() { this._unsub?.(); clearInterval(this._timer); }
   getCardSize() { return 3; }
   _isOn(id) { const s = this._hass?.states[id]; return !!s && ["on", "open", "opening"].includes(s.state); }
+  // "zone:z1", "group:g1", "program:p1" already watering or queued: their buttons stay disabled
+  _busy() {
+    const st = store.state || {};
+    const out = new Set([st.current?.target, ...(st.queue || []).map((q) => q.target)].filter(Boolean));
+    (st.current?.active || []).forEach((a) => out.add(`zone:${a.zone_id}`));
+    return out;
+  }
+  _zoneBusy(z) {
+    if (this._isOn(z.entity_id) || (store.state?.current?.active || []).some((a) => a.zone_id === z.id)) return "on";
+    return this._busy().has(`zone:${z.id}`) ? "queued" : "";
+  }
   _when(iso) {
     if (!iso) return "—";
     // Home Assistant's time zone, like the panel
@@ -233,6 +245,12 @@ class SkBaseCard extends HTMLElement {
   }
   _liveStates() {
     this.shadowRoot.querySelectorAll("[data-entity]").forEach((el) => el.classList.toggle("on", this._isOn(el.dataset.entity)));
+    // a valve opened or closed outside a run: refresh its button
+    const stale = [...this.shadowRoot.querySelectorAll("[data-run-zone]")].some((el) => {
+      const z = store.zone(el.dataset.runZone);
+      return z && (el.dataset.busy || "") !== this._zoneBusy(z);
+    });
+    if (stale) this._render();
   }
   _tick() {
     const now = store.now();
@@ -248,7 +266,7 @@ class SkBaseCard extends HTMLElement {
   async _run(action, extra) {
     try {
       const res = await store.action(action, extra);
-      this._flash(res?.blocked ? `${this.t("not_run")}: ${res.blocked.map((r) => this._reason(r)).join(", ")}`
+      this._flash(res?.busy ? this.t("busy") : res?.blocked ? `${this.t("not_run")}: ${res.blocked.map((r) => this._reason(r)).join(", ")}`
         : res?.run && store.state.current?.id !== res.run.id ? this.t("queued") : "");
     } catch (err) { this._flash(err.message || String(err)); }
   }
@@ -304,7 +322,7 @@ class SkStatusCard extends SkBaseCard {
         <div class="grow"><div class="small muted">${this.t("next")}</div>
           <div class="name ellipsis">${nxt ? esc(nxt.name) : this.t("none")}</div>
           ${nxt ? `<div class="small">${this._when(nxt.at)} · ${fmtDur(st.program_estimates?.[nxt.program_id])}</div>` : ""}</div>
-        ${nxt ? `<button class="b primary" data-a="run" data-id="${nxt.program_id}"><ha-icon icon="mdi:play"></ha-icon>${this.t("run_now")}</button>` : ""}</div>`;
+        ${nxt ? `<button class="b primary" data-a="run" data-id="${nxt.program_id}" ${this._busy().has(`program:${nxt.program_id}`) ? "disabled" : ""}><ha-icon icon="mdi:play"></ha-icon>${this.t("run_now")}</button>` : ""}</div>`;
     }
     const reasons = st.blocking.filter((r) => r !== "system_disabled");
     html += `<div class="reasons">${reasons.length
@@ -357,7 +375,7 @@ class SkProgramsCard extends SkBaseCard {
           <div class="small muted ellipsis">${esc(times)} · ${fmtDur(st.program_estimates?.[p.id])} · ${p.enabled ? this._when(st.next_runs[p.id]) : this.t("disabled")}</div>
           ${blocks.length ? `<div class="small" style="color:#b07800">⚠ ${this.t("blocked")}: ${esc(blocks.map((r) => this._reason(r)).join(", "))}</div>` : ""}</div>
         <label class="switch"><input type="checkbox" data-c="prog" data-id="${p.id}" ${p.enabled ? "checked" : ""}><span></span></label>
-        ${this._config.show_run !== false ? `<button class="i" title="${this.t("run_now")}" data-a="run" data-id="${p.id}"><ha-icon icon="mdi:play-circle-outline"></ha-icon></button>` : ""}
+        ${this._config.show_run !== false ? `<button class="i" title="${this.t("run_now")}" data-a="run" data-id="${p.id}" ${this._busy().has(`program:${p.id}`) ? "disabled" : ""}><ha-icon icon="mdi:play-circle-outline"></ha-icon></button>` : ""}
       </div>`;
     }).join("") : `<div class="empty">${this.t("none")}</div>`);
   }
@@ -397,7 +415,7 @@ class SkGroupsCard extends SkBaseCard {
         <div class="row"><b class="grow clamp2" title="${esc(g.name)}">${esc(g.name)}</b><span class="small muted">${zones.length} ${this.t("sprinklers")}</span>
           <button class="i" title="${this.t("run")}" data-a="toggle" data-id="${g.id}"><ha-icon icon="${open ? "mdi:close" : "mdi:play-circle-outline"}"></ha-icon></button></div>
         <div class="chips">${zones.map((z) => `<span class="zc ${this._isOn(z.entity_id) ? "on" : ""}" data-entity="${esc(z.entity_id || "")}"><span class="dot" style="background:${esc(z.color)}"></span>${esc(z.name)}</span>`).join("")}</div>
-        ${open ? `<div class="mins"><span class="small muted">${this.t("run")}:</span>${mins.map((m) => `<button class="b" data-a="rungroup" data-id="${g.id}" data-m="${m}">${m} ${this.t("min_each")}</button>`).join("")}</div>` : ""}
+        ${open ? `<div class="mins"><span class="small muted">${this.t("run")}:</span>${mins.map((m) => `<button class="b" data-a="rungroup" data-id="${g.id}" data-m="${m}" ${this._busy().has(`group:${g.id}`) ? "disabled" : ""}>${m} ${this.t("min_each")}</button>`).join("")}</div>` : ""}
       </div>`;
     }).join("") + "</div>" : `<div class="empty">—</div>`);
   }
@@ -441,7 +459,11 @@ class SkZonesCard extends SkBaseCard {
       return `<div class="tile ${this._isOn(z.entity_id) ? "on" : ""}" style="--c:${esc(z.color)}" data-entity="${esc(z.entity_id || "")}">
         <div class="row" style="align-items:flex-start"><span class="nm grow clamp2" title="${esc(z.name)}">${esc(z.name)}</span><span class="on-dot ${this._isOn(z.entity_id) ? "on" : ""}" data-entity="${esc(z.entity_id || "")}"></span></div>
         <div class="small muted ellipsis">${this.t("last")}: ${s?.last ? this._when(s.last) : this.t("never")}</div>
-        <button class="b" data-a="run" data-id="${z.id}" ${z.enabled && z.entity_id ? "" : "disabled"}><ha-icon icon="mdi:play"></ha-icon>${mins} ${this.t("minutes")}</button></div>`;
+        ${(() => {
+          const busy = this._zoneBusy(z);
+          return `<button class="b" data-a="run" data-id="${z.id}" data-run-zone="${z.id}" data-busy="${busy}" ${z.enabled && z.entity_id && !busy ? "" : "disabled"}>
+            <ha-icon icon="${busy === "on" ? "mdi:water" : busy === "queued" ? "mdi:tray-full" : "mdi:play"}"></ha-icon>${busy === "on" ? this.t("running") : busy === "queued" ? this.t("queued") : `${mins} ${this.t("minutes")}`}</button>`;
+        })()}</div>`;
     }).join("")}</div>` : `<div class="empty">—</div>`);
   }
   _click(e) {
