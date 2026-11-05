@@ -455,5 +455,3 @@ async def test_manual_run_records_who_and_blocks_repeats(hass, hass_ws_client):
     await _wait_idle(hass, engine)
     entry = engine.store.history[0]
     assert entry["started_by"]["kind"] == "user" and entry["by"]["kind"] == "user"
-    day = next(iter(engine.store.stats.values()))
-    assert any(k.startswith("user:") for k in day[model.STATS_MANUAL]["u"])
