@@ -2,7 +2,7 @@
 // Loaded globally by the integration (no manual resource needed). All cards on
 // a dashboard share one websocket subscription through a tiny store.
 const DOMAIN = "sk_irrigation";
-const CARD_VERSION = "1.7.1";
+const CARD_VERSION = "1.7.2";
 
 const T = {
   es: {
@@ -171,6 +171,7 @@ const CSS = `
   .tile.on { background: color-mix(in srgb, #1e88e5 10%, transparent); }
   .tile { min-width: 0; }
   .tile .nm { font-weight: 600; font-size: 13.5px; min-height: 2.5em; }
+  .tile button.b { align-self: flex-start; max-width: 100%; overflow: hidden; }
   .on-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(127,127,127,.4); }
   .on-dot.on { background: #1e88e5; box-shadow: 0 0 0 3px color-mix(in srgb, #1e88e5 25%, transparent); }
   .empty { color: var(--secondary-text-color); text-align: center; padding: 12px 0; font-size: 13.5px; }
@@ -278,9 +279,12 @@ class SkBaseCard extends HTMLElement {
   }
   _click() {}
   _change() {}
-  _cols(fallbackMin) {
-    const n = Math.round(Number(this._config.columns) || 0);
-    return n > 0 ? `grid-template-columns:repeat(${Math.min(n, 12)},minmax(0,1fr))` : `grid-template-columns:repeat(auto-fill,minmax(${fallbackMin}px,1fr))`;
+  // "columns" is the most the card shows: on a narrow screen it drops to what fits,
+  // so every item keeps at least ``minPx`` (6 columns on a phone were unreadable)
+  _cols(minPx, gap = 8) {
+    const n = Math.min(12, Math.round(Number(this._config.columns) || 0));
+    if (n <= 1) return n === 1 ? "grid-template-columns:minmax(0,1fr)" : `grid-template-columns:repeat(auto-fill,minmax(min(${minPx}px,100%),1fr))`;
+    return `grid-template-columns:repeat(auto-fill,minmax(min(100%,max(${minPx}px,calc((100% - ${(n - 1) * gap}px) / ${n}))),1fr))`;
   }
   header(icon, title, extra = "") {
     return `<div class="hd"><ha-icon icon="${icon}"></ha-icon><span class="t">${esc(title)}</span>${extra}</div>`;
@@ -408,7 +412,7 @@ class SkGroupsCard extends SkBaseCard {
     }
     const mins = this._config.minutes || [5, 10, 15];
     const cols = Number(this._config.columns) > 1;
-    return this.header("mdi:vector-arrange-below", this._config.title || this.t("groups")) + (groups.length ? `<div class="grps" style="${cols ? this._cols(240) : "grid-template-columns:1fr"}">` + groups.map((g) => {
+    return this.header("mdi:vector-arrange-below", this._config.title || this.t("groups")) + (groups.length ? `<div class="grps" style="${cols ? this._cols(240, 10) : "grid-template-columns:1fr"}">` + groups.map((g) => {
       const zones = g.zone_ids.map((z) => store.zone(z)).filter(Boolean);
       const open = this._open === g.id;
       return `<div class="grp" style="--c:${esc(g.color)}">

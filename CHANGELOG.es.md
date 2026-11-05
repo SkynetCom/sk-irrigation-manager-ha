@@ -2,6 +2,11 @@
 
 🇬🇧 [English](CHANGELOG.md) · 🇪🇸 Español
 
+## 1.7.2 — 2026-11-05
+- **Tarjetas del dashboard en el celular:** `columns` en las tarjetas de Aspersores y Grupos ahora es el máximo; en una
+  pantalla angosta la tarjeta baja a las columnas que entren (una de Aspersores con 6 columnas muestra 2 en el celular y
+  4 en una tablet). Los nombres y botones ya no quedan cortados a una letra.
+
 ## 1.7.1 — 2026-11-05
 - **Corregido: volver a tocar "Regar" en un aspersor que ya está regando sumaba más riegos a la cola.** Un aspersor, grupo
   o programa que está regando o en cola ahora tiene el botón deshabilitado ("Regando" / "En cola"), en el panel, el mapa

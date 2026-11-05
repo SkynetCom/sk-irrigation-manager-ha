@@ -136,7 +136,7 @@ La integración trae 5 tarjetas que **se cargan solas**: no hace falta agregar r
 | `custom:sk-irrigation-zones-card` | Grilla de aspersores con estado, último riego y riego manual | `title`, `group`, `columns`, `minutes` |
 | `custom:sk-irrigation-map-card` | **Solo visualización:** tus mapas de la pestaña Mapa con el riego en vivo: qué aspersor está regando, desde hace cuánto, cuánto falta y cuáles ya regaron. Sigue el ciclo de un mapa a otro | `title`, `map`, `height`, `follow`, `show_status`, `show_legend` |
 
-`columns` fija la cantidad de columnas (por ejemplo `8` para una tarjeta a todo el ancho). Si se deja vacío, se ajusta solo.
+`columns` fija el máximo de columnas (por ejemplo `8` para una tarjeta a todo el ancho); en el celular baja a las que entren. Si se deja vacío, se ajusta solo.
 
 ```yaml
 type: custom:sk-irrigation-groups-card

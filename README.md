@@ -136,7 +136,7 @@ The integration ships 5 cards that **load automatically**: no resources to add. 
 | `custom:sk-irrigation-zones-card` | Sprinkler grid with state, last run and manual watering | `title`, `group`, `columns`, `minutes` |
 | `custom:sk-irrigation-map-card` | **View only:** your maps from the Map tab with live watering: the sprinkler that is on, for how long and what is left, and what already ran. Follows the run across maps | `title`, `map`, `height`, `follow`, `show_status`, `show_legend` |
 
-`columns` sets the number of columns (for example `8` for a full-width card). Leave it empty to fit automatically.
+`columns` sets the most columns the card shows (for example `8` for a full-width card); on a phone it drops to the ones that fit. Leave it empty to fit automatically.
 
 ```yaml
 type: custom:sk-irrigation-groups-card

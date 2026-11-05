@@ -2,9 +2,9 @@
 // Loaded on demand by sk-irrigation-cards.js the first time a map card is
 // shown, so dashboards without it never download Leaflet. It reuses the Map
 // tab code through a small adapter that reads the shared card store.
-import { I18N } from "./sk-irrigation-i18n.js?v=1.7.1";
-import { MAP_STYLES } from "./sk-irrigation-styles.js?v=1.7.1";
-import { MapMixin } from "./sk-irrigation-map.js?v=1.7.1";
+import { I18N } from "./sk-irrigation-i18n.js?v=1.7.2";
+import { MAP_STYLES } from "./sk-irrigation-styles.js?v=1.7.2";
+import { MapMixin } from "./sk-irrigation-map.js?v=1.7.2";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 

@@ -2,6 +2,11 @@
 
 🇬🇧 English · 🇪🇸 [Español](CHANGELOG.es.md)
 
+## 1.7.2 — 2026-11-05
+- **Dashboard cards on phones:** `columns` on the Sprinklers and Groups cards is now the most columns shown; on a narrow
+  screen the card drops to the ones that fit (a 6-column Sprinklers card shows 2 on a phone, 4 on a tablet). Names and
+  buttons no longer get cut down to a letter.
+
 ## 1.7.1 — 2026-11-05
 - **Fixed: tapping "Water" again on a sprinkler that is already on stacked more runs in the queue.** A sprinkler, group or
   program that is watering or queued now has its button disabled ("Watering" / "Queued"), in the panel, the map and the
